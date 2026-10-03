@@ -29,6 +29,26 @@ def find_by_key(sender_user_id, idempotency_key):
     return Transfer.objects(__raw__=conditions).as_pymongo().first()
 
 
+def find_by_keys(sender_user_ids, idempotency_keys):
+    """The transfers a set of keys is currently held by, keyed by the key itself.
+
+    The same question as `find_by_key`, asked about many keys at once so that a page of
+    work costs one query instead of one per item. A key released by a failed transfer is
+    still held by nothing, so it is reported by neither.
+    """
+    if not idempotency_keys:
+        return {}
+
+    conditions = {
+        "senderUserId": {"$in": [ObjectId(sender_user_id) for sender_user_id in sender_user_ids]},
+        "idempotencyKey": {"$in": list(idempotency_keys)},
+    }
+
+    rows = collection(Transfer).find(conditions)
+
+    return {row["idempotencyKey"]: row for row in rows}
+
+
 def find_transfer(transfer_id):
     return Transfer.objects(__raw__={"_id": ObjectId(transfer_id)}).as_pymongo().first()
 

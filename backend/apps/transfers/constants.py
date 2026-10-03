@@ -24,6 +24,14 @@ IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
 # to what counts as the same request cannot silently reclassify a key already in use.
 FINGERPRINT_VERSION = "v1"
 
+# A namespace the server spends on its own behalf and a client may not. An approval derives
+# its key from the request it is approving, so that retrying an approval is one transfer
+# rather than several. A client that could spend the same key would be able to collide with
+# it deliberately, so the prefix is declared here, where keys are understood, and refused
+# from a request that carries it. The key itself never passes through this check: it is
+# handed to the engine by the feature that derived it.
+MONEY_REQUEST_KEY_PREFIX = "money-request:"
+
 # One sender, one key, one transfer. The index is partial so it only covers keys that were
 # actually sent, and it is created by the model because MongoEngine cannot express it.
 SENDER_IDEMPOTENCY_INDEX = "sender_idempotency_unique_idx"
@@ -66,3 +74,11 @@ IDEMPOTENCY_KEY_REUSED_MESSAGE = (
 # attached to one. It is stated rather than answered with a result that never happened.
 TRANSFER_ALREADY_FAILED_CODE = "TRANSFER_ALREADY_FAILED"
 TRANSFER_ALREADY_FAILED_MESSAGE = "That transfer already failed. Send it again with a new idempotency key."
+
+# A well-formed key in the namespace the server reserves for itself. It is refused for its
+# own sake rather than as a format problem, so the sender is told why rather than what a key
+# has to look like.
+IDEMPOTENCY_KEY_RESERVED_CODE = "IDEMPOTENCY_KEY_RESERVED"
+IDEMPOTENCY_KEY_RESERVED_MESSAGE = (
+    f"Idempotency keys starting with '{MONEY_REQUEST_KEY_PREFIX}' are reserved by the wallet and cannot be used."
+)

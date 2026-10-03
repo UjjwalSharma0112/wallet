@@ -67,4 +67,65 @@ TRANSFER_ROWS = [
     },
 ]
 
-BASELINE_COLLECTIONS = ("useraccounts", "wallets", "ledgerentries", "transfers")
+# Money requests are seeded through the real services rather than written straight into the
+# collection. An approved row is approved for real, so it pays through the transfer engine
+# and appears in the validated history like any other payment; a declined row is declined for
+# real; an expired row is left for the lazy expiry sweep to find, which is the same path that
+# expires one in the application. Every state a request can be shown in is seeded on both
+# sides of the request, so the baseline demonstrates the whole feature. `APPROVING` is the one
+# state that is never seeded: it only ever exists while an approval is running.
+#
+# Grace Obi is left out, so that signing in as her still shows the product's empty state.
+# The balances below are chosen so that every seeded approval can actually be paid.
+REQUEST_ROWS = [
+    {
+        "state": "PENDING",
+        "requesterEmail": "fatima.noor@wallet.demo",
+        "approverEmail": "aarav.mehta@wallet.demo",
+        "amountMinor": 120000,
+        "note": "Rent share for April",
+        "daysAgo": 1,
+    },
+    {
+        "state": "PENDING",
+        "requesterEmail": "aarav.mehta@wallet.demo",
+        "approverEmail": "diego.santos@wallet.demo",
+        "amountMinor": 75000,
+        "note": "Concert tickets",
+        "daysAgo": 2,
+    },
+    {
+        "state": "APPROVED",
+        "requesterEmail": "aarav.mehta@wallet.demo",
+        "approverEmail": "fatima.noor@wallet.demo",
+        "amountMinor": 30000,
+        "note": "Dinner last Friday",
+        "daysAgo": 5,
+    },
+    {
+        "state": "APPROVED",
+        "requesterEmail": "diego.santos@wallet.demo",
+        "approverEmail": "aarav.mehta@wallet.demo",
+        "amountMinor": 150000,
+        "note": "Invoice 2214",
+        "daysAgo": 3,
+    },
+    {
+        "state": "DECLINED",
+        "requesterEmail": "diego.santos@wallet.demo",
+        "approverEmail": "fatima.noor@wallet.demo",
+        "amountMinor": 400000,
+        "note": "Loan repayment",
+        "daysAgo": 4,
+    },
+    {
+        "state": "EXPIRED",
+        "requesterEmail": "aarav.mehta@wallet.demo",
+        "approverEmail": "diego.santos@wallet.demo",
+        "amountMinor": 60000,
+        "note": "Second-hand books",
+        "daysAgo": 9,
+    },
+]
+
+BASELINE_COLLECTIONS = ("useraccounts", "wallets", "ledgerentries", "transfers", "moneyrequests")

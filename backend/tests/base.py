@@ -26,6 +26,7 @@ from django.test import Client, SimpleTestCase  # noqa: E402
 from apps.auth.models import UserAccount  # noqa: E402
 from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.auth.services import login  # noqa: E402
+from apps.money_requests.models import MoneyRequest  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
 from apps.transfers.models import ensure_transfer_indexes  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
@@ -34,7 +35,7 @@ from apps.wallet.services import create_wallet  # noqa: E402
 TEST_DATABASE_SUFFIX = "_test"
 TEST_PASSWORD = "Wallet@2026"
 TEST_SALT_ROUNDS = 4
-APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer)
+APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest)
 
 
 def test_database_uri(uri):

@@ -6,9 +6,12 @@ from .constants import (
     IDEMPOTENCY_KEY_INVALID_CODE,
     IDEMPOTENCY_KEY_INVALID_MESSAGE,
     IDEMPOTENCY_KEY_PATTERN,
+    IDEMPOTENCY_KEY_RESERVED_CODE,
+    IDEMPOTENCY_KEY_RESERVED_MESSAGE,
     MAX_IDEMPOTENCY_KEY_LENGTH,
     MAX_NOTE_LENGTH,
     MAX_TRANSFER_MINOR,
+    MONEY_REQUEST_KEY_PREFIX,
     MIN_IDEMPOTENCY_KEY_LENGTH,
 )
 
@@ -48,6 +51,12 @@ def read_idempotency_key(headers):
     *is* sent has to be something the server can store and compare, so its format is checked
     here — before the recipient is resolved and before anything is written, so a malformed
     key never reaches the database.
+
+    The one key that is well formed but still refused is one in the namespace the server
+    spends on its own behalf, because an approval derives its key from the request it is
+    approving and a client must not be able to claim that name. This check is only ever
+    reached from an incoming request: a key the server derived is handed to the engine
+    directly and never read back through here.
     """
     raw = headers.get(IDEMPOTENCY_KEY_HEADER)
 
@@ -59,5 +68,8 @@ def read_idempotency_key(headers):
 
     if not usable or not IDEMPOTENCY_KEY_PATTERN.match(key):
         raise AppError(400, IDEMPOTENCY_KEY_INVALID_CODE, IDEMPOTENCY_KEY_INVALID_MESSAGE)
+
+    if key.startswith(MONEY_REQUEST_KEY_PREFIX):
+        raise AppError(400, IDEMPOTENCY_KEY_RESERVED_CODE, IDEMPOTENCY_KEY_RESERVED_MESSAGE)
 
     return key

@@ -25,6 +25,10 @@ from bson import ObjectId  # noqa: E402
 from mongoengine.connection import get_db  # noqa: E402
 
 from apps.auth.models import UserAccount  # noqa: E402
+from apps.money_requests.constants import APPROVED_STATE, DECLINED_STATE, PENDING_STATE, REQUEST_TTL_DAYS  # noqa: E402
+from apps.money_requests.models import MoneyRequest  # noqa: E402
+from apps.money_requests.repository import expire_for_account  # noqa: E402
+from apps.money_requests.services import approve_request, decline_request  # noqa: E402
 from apps.shared.mongo import collection, to_dict  # noqa: E402
 from apps.transfers.constants import COMPLETED_STATE  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
@@ -37,7 +41,7 @@ from scripts import seed_data  # noqa: E402
 
 SEPARATOR = "========================================"
 
-SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer)
+SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest)
 
 
 def connect():
@@ -109,6 +113,17 @@ def validate_wallets(accounts):
                 raise ValueError(f"Seed ledger entry is attached to the wrong owner for {email}.")
 
 
+def backdate_transfer(transfer_id, moment):
+    """Move a transfer and the ledger entries it wrote back to the moment it belongs to."""
+    for model, query in (
+        (Transfer, {"_id": transfer_id}),
+        (LedgerEntry, {"transactionId": transfer_id}),
+    ):
+        collection(model).update_many(query, {"$set": {"createdAt": moment, "updatedAt": moment}})
+
+    collection(Transfer).update_one({"_id": transfer_id}, {"$set": {"completedAt": moment}})
+
+
 def insert_transfers(accounts):
     """Run the real transfer service so the seeded history is one a request could produce."""
     seeded_at = datetime.now(timezone.utc)
@@ -122,14 +137,7 @@ def insert_transfers(accounts):
         result, _ = execute_transfer(by_email[row["senderEmail"]], row["recipientEmail"], row["amountMinor"], None)
         transfer_id = ObjectId(result["transfer"]["id"])
         moment = seeded_at - timedelta(days=row["daysAgo"])
-
-        for model, query in (
-            (Transfer, {"_id": transfer_id}),
-            (LedgerEntry, {"transactionId": transfer_id}),
-        ):
-            collection(model).update_many(query, {"$set": {"createdAt": moment, "updatedAt": moment}})
-
-        collection(Transfer).update_one({"_id": transfer_id}, {"$set": {"completedAt": moment}})
+        backdate_transfer(transfer_id, moment)
         transfers.append(transfer_id)
 
     print(f"  Sent {len(transfers)} transfers")
@@ -161,6 +169,102 @@ def validate_transfers(transfers):
 
             if leg["userId"] != expected_user:
                 raise ValueError(f"Seed transfer {transfer_id} recorded a leg for the wrong owner.")
+
+
+def insert_requests(accounts, transfers):
+    """Seed requests through the real services, so the baseline cannot disagree with them.
+
+    An approved request is approved for real and therefore pays through the transfer engine,
+    so its transfer joins the validated history instead of being a figure written to look like
+    a payment. A declined request is declined for real. An expired one is left for the lazy
+    expiry sweep to find, which is the same sweep that expires one in the application. Each
+    row is backdated afterwards, so the baseline reads as a sequence of events rather than as
+    everything having happened at once.
+    """
+    seeded_at = datetime.now(timezone.utc)
+    by_email = {account.email: to_dict(account) for account in accounts}
+    seeded = []
+
+    for row in seed_data.REQUEST_ROWS:
+        requester = by_email[row["requesterEmail"]]
+        approver = by_email[row["approverEmail"]]
+        moment = seeded_at - timedelta(days=row["daysAgo"])
+        request = MoneyRequest(
+            requester_user_id=requester["_id"],
+            approver_user_id=approver["_id"],
+            amount_minor=row["amountMinor"],
+            note=row["note"],
+            state=PENDING_STATE,
+            expires_at=moment + timedelta(days=REQUEST_TTL_DAYS),
+        ).save()
+
+        if row["state"] == APPROVED_STATE:
+            result = approve_request(approver, str(request.id))
+            transfer_id = ObjectId(result["transfer"]["id"])
+            transfers.append(transfer_id)
+            backdate_transfer(transfer_id, moment)
+        elif row["state"] == DECLINED_STATE:
+            decline_request(approver, str(request.id))
+        else:
+            # Only the expired row's window has closed, and only the account it is addressed
+            # to can find it. That is exactly how a request expires in the application.
+            expire_for_account(approver["_id"], seeded_at)
+
+        backdate_request(request.id, moment)
+        seeded.append((request.id, row["state"]))
+
+    print(f"  Created {len(seeded)} money requests")
+
+    return seeded
+
+
+def backdate_request(request_id, moment):
+    """Move a seeded request back into the history it belongs to.
+
+    `resolvedAt` moves with it when the request was answered, so an answered request reads as
+    answered when it was rather than when the seed happened to run.
+    """
+    stored = MoneyRequest.objects(__raw__={"_id": request_id}).as_pymongo().first()
+    changes = {"createdAt": moment, "updatedAt": moment}
+
+    if stored.get("resolvedAt"):
+        changes["resolvedAt"] = moment
+
+    collection(MoneyRequest).update_one({"_id": request_id}, {"$set": changes})
+
+
+def validate_requests(seeded):
+    """A seeded request must be in the state it was seeded as, and must name the right transfer.
+
+    Only an approved request may name a transfer at all, and it has to be the transfer that
+    was really created for it: sent by the account being asked, sent to the account that
+    asked, for the amount that was asked for. That is what stops a declined or expired request
+    in the baseline from ever claiming a payment nobody made.
+    """
+    for request_id, expected_state in seeded:
+        request = MoneyRequest.objects(__raw__={"_id": request_id}).as_pymongo().first()
+
+        if request["state"] != expected_state:
+            raise ValueError(f"Seed money request {request_id} is {request['state']}, expected {expected_state}.")
+
+        if expected_state != APPROVED_STATE:
+            if request.get("transferId"):
+                raise ValueError(f"Seed money request {request_id} is {expected_state} but names a transfer.")
+
+            continue
+
+        transfer = Transfer.objects(__raw__={"_id": request["transferId"]}).as_pymongo().first()
+
+        if transfer is None or transfer["state"] != COMPLETED_STATE:
+            raise ValueError(f"Seed money request {request_id} is approved without a completed transfer.")
+
+        sent, received = transfer["senderUserId"], transfer["recipientUserId"]
+
+        if sent != request["approverUserId"] or received != request["requesterUserId"]:
+            raise ValueError(f"Seed money request {request_id} was approved by a transfer that paid the wrong way round.")
+
+        if transfer["amountMinor"] != request["amountMinor"]:
+            raise ValueError(f"Seed money request {request_id} was approved by a transfer of a different amount.")
 
 
 def validate_system_total():
@@ -197,7 +301,9 @@ def seed():
     wallets = insert_wallets(accounts)
     backdate_opening_entries(wallets)
     transfers = insert_transfers(accounts)
+    requests = insert_requests(accounts, transfers)
     validate_transfers(transfers)
+    validate_requests(requests)
     validate_wallets(accounts)
     validate_system_total()
     ensure_indexes()

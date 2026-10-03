@@ -2,6 +2,8 @@ import io
 from contextlib import redirect_stdout
 
 from apps.auth.models import UserAccount
+from apps.money_requests.constants import APPROVED_STATE
+from apps.money_requests.models import MoneyRequest
 from apps.transfers.models import Transfer
 from apps.wallet.models import LedgerEntry, Wallet
 from apps.wallet.repository import derived_balance
@@ -11,6 +13,11 @@ from scripts import seed_data
 from .base import MongoTestCase
 
 OPENING_ENTRY_COUNT = len([row for row in seed_data.ACCOUNT_ROWS if row["openingBalanceMinor"] > 0])
+
+# An approved request is paid through the transfer engine rather than written as a figure, so
+# its transfer is part of the seeded history too and the counts below have to include it.
+APPROVED_REQUEST_COUNT = len([row for row in seed_data.REQUEST_ROWS if row["state"] == APPROVED_STATE])
+SEEDED_TRANSFER_COUNT = len(seed_data.TRANSFER_ROWS) + APPROVED_REQUEST_COUNT
 
 
 class SeedTest(MongoTestCase):
@@ -23,10 +30,9 @@ class SeedTest(MongoTestCase):
 
         self.assertEqual(UserAccount.objects.count(), len(seed_data.ACCOUNT_ROWS))
         self.assertEqual(Wallet.objects.count(), len(seed_data.ACCOUNT_ROWS))
-        self.assertEqual(Transfer.objects.count(), len(seed_data.TRANSFER_ROWS))
-        self.assertEqual(
-            LedgerEntry.objects.count(), OPENING_ENTRY_COUNT + 2 * len(seed_data.TRANSFER_ROWS)
-        )
+        self.assertEqual(Transfer.objects.count(), SEEDED_TRANSFER_COUNT)
+        self.assertEqual(LedgerEntry.objects.count(), OPENING_ENTRY_COUNT + 2 * SEEDED_TRANSFER_COUNT)
+        self.assertEqual(MoneyRequest.objects.count(), len(seed_data.REQUEST_ROWS))
 
     def test_two_seed_runs_produce_the_same_baseline(self):
         self.run_seed()
@@ -75,7 +81,8 @@ class SeedTest(MongoTestCase):
         self.assertEqual(len(unopened), 1)
 
         for row in unopened:
-            wallet = Wallet.objects(__raw__={"userId": UserAccount.objects(__raw__={"email": row["email"]}).first().id}).as_pymongo().first()
+            account = UserAccount.objects(__raw__={"email": row["email"]}).first()
+            wallet = Wallet.objects(__raw__={"userId": account.id}).as_pymongo().first()
 
             self.assertEqual(wallet["availableBalanceMinor"], 0)
             self.assertEqual(LedgerEntry.objects(__raw__={"walletId": wallet["_id"]}).count(), 0)
@@ -83,7 +90,7 @@ class SeedTest(MongoTestCase):
     def test_every_seeded_transfer_is_complete_and_recorded_on_both_wallets(self):
         self.run_seed()
 
-        self.assertEqual(Transfer.objects(__raw__={"state": "COMPLETED"}).count(), len(seed_data.TRANSFER_ROWS))
+        self.assertEqual(Transfer.objects(__raw__={"state": "COMPLETED"}).count(), SEEDED_TRANSFER_COUNT)
 
         for transfer in Transfer.objects.as_pymongo():
             with self.subTest(transfer=str(transfer["_id"])):
@@ -94,6 +101,27 @@ class SeedTest(MongoTestCase):
                     {leg["walletId"] for leg in legs}, {transfer["senderWalletId"], transfer["recipientWalletId"]}
                 )
                 self.assertEqual({leg["amountMinor"] for leg in legs}, {transfer["amountMinor"]})
+
+    def test_only_an_approved_seeded_request_names_a_transfer(self):
+        # A declined or expired request that claimed a payment in the baseline would be a
+        # feature that appears to work and does not, so the link is checked from both ends.
+        self.run_seed()
+
+        named = set(MoneyRequest.objects(__raw__={"transferId": {"$exists": True}}).distinct("state"))
+
+        self.assertEqual(named, {APPROVED_STATE})
+        self.assertEqual(MoneyRequest.objects(__raw__={"state": APPROVED_STATE}).count(), APPROVED_REQUEST_COUNT)
+
+    def test_every_seeded_request_names_two_accounts_that_exist(self):
+        self.run_seed()
+
+        account_ids = {account.id for account in UserAccount.objects}
+
+        for request in MoneyRequest.objects.as_pymongo():
+            with self.subTest(request=str(request["_id"])):
+                self.assertIn(request["requesterUserId"], account_ids)
+                self.assertIn(request["approverUserId"], account_ids)
+                self.assertNotEqual(request["requesterUserId"], request["approverUserId"])
 
     def test_seeded_transfers_do_not_change_the_total_money_in_the_system(self):
         self.run_seed()
