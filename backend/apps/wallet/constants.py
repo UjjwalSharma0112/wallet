@@ -1,0 +1,11 @@
+CURRENCY = "INR"
+
+ENTRY_KINDS = ["OPENING"]
+ENTRY_DIRECTIONS = ["CREDIT", "DEBIT"]
+OPENING_KIND = "OPENING"
+
+WALLET_EXISTS_MESSAGE = "This account already has a wallet."
+WALLET_NOT_FOUND_MESSAGE = "This account does not have a wallet yet."
+
+DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 100
