@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/v1/health", health),
     path("api/v1/", include("apps.auth.urls")),
     path("api/v1/", include("apps.wallet.urls")),
+    path("api/v1/", include("apps.transfers.urls")),
     re_path(r"^api/v1/(?P<path>.*)$", unknown_api_route),
     re_path(r"^.*$", not_found),
 ]

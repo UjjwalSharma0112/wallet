@@ -24,14 +24,16 @@ from django.conf import settings  # noqa: E402
 from django.test import Client, SimpleTestCase  # noqa: E402
 
 from apps.auth.models import UserAccount  # noqa: E402
+from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.auth.services import login  # noqa: E402
+from apps.transfers.models import Transfer  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
 from apps.wallet.services import create_wallet  # noqa: E402
 
 TEST_DATABASE_SUFFIX = "_test"
 TEST_PASSWORD = "Wallet@2026"
 TEST_SALT_ROUNDS = 4
-APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry)
+APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer)
 
 
 def test_database_uri(uri):
@@ -74,6 +76,10 @@ class MongoTestCase(SimpleTestCase):
 
     def token_for(self, email):
         return login(email, self.password)["token"]
+
+    def account_document(self, account):
+        """The account in the shape a request carries it, so services can be called directly."""
+        return find_active_by_id(str(account.id))
 
     def api_client(self, token=""):
         headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"} if token else {}

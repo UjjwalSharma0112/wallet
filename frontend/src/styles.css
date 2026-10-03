@@ -280,6 +280,75 @@ body {
 	background: var(--surface-raised);
 }
 
+.transfer {
+	padding: 22px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-raised);
+}
+
+.transfer-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.transfer-heading {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 500;
+}
+
+.transfer-available {
+	color: var(--text-muted);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.transfer-form {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.transfer-row {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+
+.transfer-actions {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
+.transfer-confirm {
+	color: var(--text-muted);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.transfer-notice {
+	margin: 0;
+	color: var(--accent);
+	font-size: 13px;
+}
+
+.field-optional {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.history-row-note {
+	color: var(--text-muted);
+	font-size: 13px;
+	font-style: italic;
+	overflow-wrap: anywhere;
+}
+
 .history-header {
 	display: flex;
 	align-items: baseline;
@@ -441,6 +510,15 @@ body {
 
 	.wallet-card-amount {
 		font-size: 34px;
+	}
+
+	.transfer-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.transfer-actions {
+		align-items: flex-start;
+		flex-direction: column;
 	}
 
 	.history-row {

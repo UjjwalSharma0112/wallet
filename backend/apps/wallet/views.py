@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from apps.shared.authentication import require_auth
+from apps.transfers import services as transfer_services
 
 from . import services
 from .schema import validate_list
@@ -17,5 +18,11 @@ def wallet(request):
 @require_auth
 def transactions(request):
     limit, offset = validate_list(request.query_params)
+    account_id = str(request.account["_id"])
+    page = services.list_transactions(account_id, limit, offset)
+    # Who a transfer was with is transfer data, so it is resolved by the transfers app
+    # rather than copied onto the ledger. Calling it from here keeps that dependency
+    # pointing one way, since the transfers app already depends on this one.
+    page["entries"] = transfer_services.decorate_entries(page["entries"], account_id)
 
-    return Response({"data": services.list_transactions(str(request.account["_id"]), limit, offset)})
+    return Response({"data": page})

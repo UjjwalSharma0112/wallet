@@ -36,7 +36,15 @@ export async function request(path, options = {}) {
 			window.dispatchEvent(new CustomEvent("wallet-session-expired", { detail: message }));
 		}
 
-		throw new Error(message);
+		// The code and details travel with the error so a form can tell a field mistake
+		// from a refusal, and can put each message under the field it came from.
+		const error = new Error(message);
+
+		error.code = code || "REQUEST_FAILED";
+		error.status = response.status;
+		error.details = payload?.error?.details || null;
+
+		throw error;
 	}
 
 	if (!payload || !("data" in payload)) throw new Error("Wallet service returned an invalid response.");

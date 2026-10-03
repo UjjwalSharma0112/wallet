@@ -2,12 +2,15 @@ import io
 from contextlib import redirect_stdout
 
 from apps.auth.models import UserAccount
+from apps.transfers.models import Transfer
 from apps.wallet.models import LedgerEntry, Wallet
 from apps.wallet.repository import derived_balance
 from scripts import seed as seed_script
 from scripts import seed_data
 
 from .base import MongoTestCase
+
+OPENING_ENTRY_COUNT = len([row for row in seed_data.ACCOUNT_ROWS if row["openingBalanceMinor"] > 0])
 
 
 class SeedTest(MongoTestCase):
@@ -20,7 +23,10 @@ class SeedTest(MongoTestCase):
 
         self.assertEqual(UserAccount.objects.count(), len(seed_data.ACCOUNT_ROWS))
         self.assertEqual(Wallet.objects.count(), len(seed_data.ACCOUNT_ROWS))
-        self.assertEqual(LedgerEntry.objects.count(), 3)
+        self.assertEqual(Transfer.objects.count(), len(seed_data.TRANSFER_ROWS))
+        self.assertEqual(
+            LedgerEntry.objects.count(), OPENING_ENTRY_COUNT + 2 * len(seed_data.TRANSFER_ROWS)
+        )
 
     def test_two_seed_runs_produce_the_same_baseline(self):
         self.run_seed()
@@ -73,3 +79,33 @@ class SeedTest(MongoTestCase):
 
             self.assertEqual(wallet["availableBalanceMinor"], 0)
             self.assertEqual(LedgerEntry.objects(__raw__={"walletId": wallet["_id"]}).count(), 0)
+
+    def test_every_seeded_transfer_is_complete_and_recorded_on_both_wallets(self):
+        self.run_seed()
+
+        self.assertEqual(Transfer.objects(__raw__={"state": "COMPLETED"}).count(), len(seed_data.TRANSFER_ROWS))
+
+        for transfer in Transfer.objects.as_pymongo():
+            with self.subTest(transfer=str(transfer["_id"])):
+                legs = LedgerEntry.objects(__raw__={"transactionId": transfer["_id"]}).as_pymongo()
+
+                self.assertEqual(len(legs), 2)
+                self.assertEqual(
+                    {leg["walletId"] for leg in legs}, {transfer["senderWalletId"], transfer["recipientWalletId"]}
+                )
+                self.assertEqual({leg["amountMinor"] for leg in legs}, {transfer["amountMinor"]})
+
+    def test_seeded_transfers_do_not_change_the_total_money_in_the_system(self):
+        self.run_seed()
+
+        total = sum(wallet["availableBalanceMinor"] for wallet in Wallet.objects.as_pymongo())
+        opening = sum(row["openingBalanceMinor"] for row in seed_data.ACCOUNT_ROWS)
+
+        self.assertEqual(total, opening)
+
+    def test_no_wallet_is_left_holding_an_unfinished_movement(self):
+        self.run_seed()
+
+        for wallet in Wallet.objects.as_pymongo():
+            with self.subTest(wallet=str(wallet["_id"])):
+                self.assertEqual(wallet.get("pendingMovements", []), [])

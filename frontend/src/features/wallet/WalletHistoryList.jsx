@@ -1,4 +1,4 @@
-import { entryLabel, formatMinor, formatMoment } from "./wallet-format.js";
+import { entryLabel, entryNote, formatMinor, formatMoment } from "./wallet-format.js";
 
 export function WalletHistoryList({
 	entries = [],
@@ -47,11 +47,13 @@ export function WalletHistoryList({
 					{entries.map((entry) => {
 						const isDebit = entry.direction === "DEBIT";
 						const amountClass = isDebit ? "history-row-amount history-row-amount-debit" : "history-row-amount";
+						const note = entryNote(entry);
 
 						return (
 							<li className="history-row" key={entry.id}>
 								<div className="history-row-main">
 									<span className="history-row-label">{entryLabel(entry)}</span>
+									{note ? <span className="history-row-note">“{note}”</span> : null}
 									<span className="history-row-moment">{formatMoment(entry.createdAt)}</span>
 								</div>
 								<div className="history-row-amounts">

@@ -21,10 +21,14 @@ import django  # noqa: E402
 django.setup()
 
 import bcrypt  # noqa: E402
+from bson import ObjectId  # noqa: E402
 from mongoengine.connection import get_db  # noqa: E402
 
 from apps.auth.models import UserAccount  # noqa: E402
-from apps.shared.mongo import collection  # noqa: E402
+from apps.shared.mongo import collection, to_dict  # noqa: E402
+from apps.transfers.constants import COMPLETED_STATE  # noqa: E402
+from apps.transfers.models import Transfer  # noqa: E402
+from apps.transfers.services import execute_transfer  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
 from apps.wallet.repository import derived_balance  # noqa: E402
 from apps.wallet.services import create_wallet  # noqa: E402
@@ -32,7 +36,7 @@ from scripts import seed_data  # noqa: E402
 
 SEPARATOR = "========================================"
 
-SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry)
+SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer)
 
 
 def connect():
@@ -86,20 +90,87 @@ def backdate_opening_entries(wallets):
     print(f"  Recorded {LedgerEntry.objects.count()} opening ledger entries")
 
 
-def validate_wallets(accounts, wallets):
-    for account, row, wallet in zip(accounts, seed_data.ACCOUNT_ROWS, wallets):
-        email = row["email"]
-        stored = wallet["availableBalanceMinor"]
+def validate_wallets(accounts):
+    """Every wallet must agree with its own ledger and own all of its entries.
 
-        if stored != row["openingBalanceMinor"]:
-            raise ValueError(f"Seed wallet balance does not match the opening balance for {email}.")
+    Balances are read fresh rather than reused from provisioning, because seeded
+    transfers have since moved money.
+    """
+    for account in accounts:
+        email = account.email
+        wallet = Wallet.objects(__raw__={"userId": account.id}).as_pymongo().first()
 
-        if derived_balance(wallet["_id"]) != stored:
+        if derived_balance(wallet["_id"]) != wallet["availableBalanceMinor"]:
             raise ValueError(f"Seed ledger does not reconcile with the stored balance for {email}.")
 
         for entry in LedgerEntry.objects(__raw__={"walletId": wallet["_id"]}).as_pymongo():
             if entry["userId"] != account.id:
                 raise ValueError(f"Seed ledger entry is attached to the wrong owner for {email}.")
+
+
+def insert_transfers(accounts):
+    """Run the real transfer service so the seeded history is one a request could produce."""
+    seeded_at = datetime.now(timezone.utc)
+    # The service takes the same account document a request carries, so the documents
+    # built for insertion are handed over in that shape.
+    by_email = {account.email: to_dict(account) for account in accounts}
+    transfers = []
+
+    for row in seed_data.TRANSFER_ROWS:
+        result = execute_transfer(
+            by_email[row["senderEmail"]], row["recipientEmail"], row["amountMinor"], None
+        )
+        transfer_id = ObjectId(result["transfer"]["id"])
+        moment = seeded_at - timedelta(days=row["daysAgo"])
+
+        for model, query in (
+            (Transfer, {"_id": transfer_id}),
+            (LedgerEntry, {"transactionId": transfer_id}),
+        ):
+            collection(model).update_many(query, {"$set": {"createdAt": moment, "updatedAt": moment}})
+
+        collection(Transfer).update_one({"_id": transfer_id}, {"$set": {"completedAt": moment}})
+        transfers.append(transfer_id)
+
+    print(f"  Sent {len(transfers)} transfers")
+
+    return transfers
+
+
+def validate_transfers(transfers):
+    """A seeded transfer must be complete, recorded on both wallets, and value-preserving."""
+    for transfer_id in transfers:
+        transfer = Transfer.objects(__raw__={"_id": transfer_id}).as_pymongo().first()
+
+        if transfer["state"] != COMPLETED_STATE:
+            raise ValueError(f"Seed transfer {transfer_id} did not complete.")
+
+        legs = LedgerEntry.objects(__raw__={"transactionId": transfer_id}).as_pymongo()
+
+        if len(legs) != 2:
+            raise ValueError(f"Seed transfer {transfer_id} did not record both ledger entries.")
+
+        moved = sum(leg["amountMinor"] for leg in legs if leg["direction"] == "DEBIT")
+        received = sum(leg["amountMinor"] for leg in legs if leg["direction"] == "CREDIT")
+
+        if moved != received or moved != transfer["amountMinor"]:
+            raise ValueError(f"Seed transfer {transfer_id} did not conserve value.")
+
+        for leg in legs:
+            expected_user = transfer["senderUserId"] if leg["direction"] == "DEBIT" else transfer["recipientUserId"]
+
+            if leg["userId"] != expected_user:
+                raise ValueError(f"Seed transfer {transfer_id} recorded a leg for the wrong owner.")
+
+
+def validate_system_total():
+    """Transfers move money between wallets, so the sum of all balances must hold still."""
+    wallets = Wallet.objects.as_pymongo()
+    total = sum(wallet["availableBalanceMinor"] for wallet in wallets)
+    opening = sum(row["openingBalanceMinor"] for row in seed_data.ACCOUNT_ROWS)
+
+    if total != opening:
+        raise ValueError("Seed transfers changed the total money in the system.")
 
 
 def ensure_indexes():
@@ -121,7 +192,10 @@ def seed():
     accounts = insert_accounts()
     wallets = insert_wallets(accounts)
     backdate_opening_entries(wallets)
-    validate_wallets(accounts, wallets)
+    transfers = insert_transfers(accounts)
+    validate_transfers(transfers)
+    validate_wallets(accounts)
+    validate_system_total()
     ensure_indexes()
 
     print("\nCollection counts:")
