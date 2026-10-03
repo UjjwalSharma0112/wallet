@@ -23,11 +23,13 @@ import mongoengine  # noqa: E402
 from django.conf import settings  # noqa: E402
 from django.test import Client, SimpleTestCase  # noqa: E402
 
+from apps.auth.constants import USER_ROLE  # noqa: E402
 from apps.auth.models import UserAccount  # noqa: E402
 from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.auth.services import login  # noqa: E402
 from apps.money_requests.models import MoneyRequest  # noqa: E402
 from apps.refunds.models import Refund, ensure_refund_indexes  # noqa: E402
+from apps.shared.mongo import collection  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
 from apps.transfers.models import ensure_transfer_indexes  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
@@ -73,18 +75,35 @@ class MongoTestCase(SimpleTestCase):
         for model in APPLICATION_MODELS:
             model.objects.delete()
 
-    def create_account(self, name="Test User", email="test@wallet.demo", opening_balance_minor=0, active=True, provision=True):
+    def create_account(
+        self, name="Test User", email="test@wallet.demo", opening_balance_minor=0, active=True, provision=True, role=USER_ROLE
+    ):
+        """An account to sign in as. `role` is last so existing call sites are unaffected."""
         account = UserAccount(
             name=name,
             email=email,
             password_hash=bcrypt.hashpw(self.password.encode(), bcrypt.gensalt(TEST_SALT_ROUNDS)).decode(),
             active=active,
+            role=role,
         ).save()
 
         if provision:
             create_wallet(account.id, opening_balance_minor)
 
         return account
+
+    def set_stored_role(self, account, role):
+        """Change the role on the stored document, as an operator would, not as a request could.
+
+        The role guard reads this value, so writing it here is what a promotion or a demotion
+        looks like from the outside: a change in the database that a token already issued
+        knows nothing about.
+        """
+        collection(UserAccount).update_one({"_id": account.id}, {"$set": {"role": role}})
+
+    def store_account_without_role(self, account):
+        """Remove the role from the stored document, as an account written before roles existed."""
+        collection(UserAccount).update_one({"_id": account.id}, {"$unset": {"role": ""}})
 
     def token_for(self, email):
         return login(email, self.password)["token"]

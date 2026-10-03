@@ -27,7 +27,14 @@ class LoginTest(MongoTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["data"]["account"],
-            {"id": str(account.id), "name": "Aarav Mehta", "email": "aarav.mehta@wallet.demo"},
+            {
+                "id": str(account.id),
+                "name": "Aarav Mehta",
+                "email": "aarav.mehta@wallet.demo",
+                # The role travels with the account so the client can know what it is allowed
+                # to be offered. It is the only field R8 added to this reply.
+                "role": "USER",
+            },
         )
         self.assertTrue(response.json()["data"]["token"])
 

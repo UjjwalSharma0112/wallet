@@ -25,6 +25,7 @@ from bson import ObjectId  # noqa: E402
 from mongoengine.connection import get_db  # noqa: E402
 
 from apps.auth.models import UserAccount  # noqa: E402
+from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.money_requests.constants import APPROVED_STATE, DECLINED_STATE, PENDING_STATE, REQUEST_TTL_DAYS  # noqa: E402
 from apps.money_requests.models import MoneyRequest  # noqa: E402
 from apps.money_requests.repository import expire_for_account  # noqa: E402
@@ -70,7 +71,10 @@ def baseline_report(database):
 def insert_accounts():
     print("\nSeeding sign-in accounts...")
     password_hash = bcrypt.hashpw(seed_data.DEMO_PASSWORD.encode(), bcrypt.gensalt(seed_data.PASSWORD_ROUNDS)).decode()
-    accounts = [UserAccount(name=row["name"], email=row["email"], password_hash=password_hash) for row in seed_data.ACCOUNT_ROWS]
+    accounts = [
+        UserAccount(name=row["name"], email=row["email"], password_hash=password_hash, role=row["role"])
+        for row in seed_data.ACCOUNT_ROWS
+    ]
     UserAccount.objects.insert(accounts)
 
     print(f"  Created {len(accounts)} accounts")
@@ -114,6 +118,24 @@ def validate_wallets(accounts):
         for entry in LedgerEntry.objects(__raw__={"walletId": wallet["_id"]}).as_pymongo():
             if entry["userId"] != account.id:
                 raise ValueError(f"Seed ledger entry is attached to the wrong owner for {email}.")
+
+
+def validate_roles(accounts):
+    """Every seeded account must carry the role it was seeded as, stored rather than assumed.
+
+    A role is only meaningful once it is on the record: the authorization guard reads the
+    stored document, and a document written without one is a different thing from a document
+    that says what it holds. The roles are also read back through the repository rather than
+    off the model instance, because that is the shape a request actually carries.
+    """
+    for account in accounts:
+        stored = find_active_by_id(str(account.id))
+
+        if stored is None:
+            raise ValueError(f"Seed account {account.email} was not written.")
+
+        if stored.get("role") != account.role:
+            raise ValueError(f"Seed account {account.email} was not stored with the role it was seeded as.")
 
 
 def backdate_transfer(transfer_id, moment):
@@ -394,6 +416,7 @@ def seed():
     validate_requests(requests)
     validate_refunds(refunds)
     validate_wallets(accounts)
+    validate_roles(accounts)
     validate_system_total()
     ensure_indexes()
 
@@ -405,7 +428,7 @@ def seed():
     print("\nDemo accounts:")
 
     for row in seed_data.ACCOUNT_ROWS:
-        print(f"  Email: {row['email']} | Password: {seed_data.DEMO_PASSWORD}")
+        print(f"  Email: {row['email']} | Password: {seed_data.DEMO_PASSWORD} | Role: {row['role']}")
 
     print(f"\n{SEPARATOR}")
     print("Seeding completed successfully!")

@@ -10,35 +10,45 @@ money between accounts but never create it, so the opening balances remain the o
 source of funds in the baseline.
 """
 
+from apps.auth.constants import USER_ROLE
+
 DATABASE_NAME = "wallet_db"
 
 PASSWORD_ROUNDS = 12
 DEMO_PASSWORD = "Wallet@2026"
 
+# Every account is an ordinary holder. Roles exist and are enforced, but no requirement gives
+# any role a capability that an ordinary holder lacks, and nothing in this product is an
+# administrative operation, so every seeded account is a USER. The role is written out rather
+# than left to the model's default, so the baseline says what it means on the record.
 ACCOUNT_ROWS = [
     {
         "name": "Aarav Mehta",
         "email": "aarav.mehta@wallet.demo",
         "openingBalanceMinor": 245000,
         "openingDaysAgo": 96,
+        "role": USER_ROLE,
     },
     {
         "name": "Fatima Noor",
         "email": "fatima.noor@wallet.demo",
         "openingBalanceMinor": 12850,
         "openingDaysAgo": 41,
+        "role": USER_ROLE,
     },
     {
         "name": "Grace Obi",
         "email": "grace.obi@wallet.demo",
         "openingBalanceMinor": 0,
         "openingDaysAgo": 12,
+        "role": USER_ROLE,
     },
     {
         "name": "Diego Santos",
         "email": "diego.santos@wallet.demo",
         "openingBalanceMinor": 965000,
         "openingDaysAgo": 8,
+        "role": USER_ROLE,
     },
 ]
 

@@ -9,6 +9,7 @@ from apps.shared.errors import AppError
 from apps.shared.validation import is_object_id
 
 from . import repository
+from .constants import USER_ROLE
 
 TOKEN_ALGORITHM = "HS256"
 TOKEN_TYPE = "session"
@@ -27,8 +28,31 @@ def expiry_seconds(value):
     return int(matched.group(1)) * SECONDS_PER_UNIT[matched.group(2)]
 
 
+def account_role(account):
+    """The role an account holds, read from the stored document and never from a token.
+
+    An account written before this field existed, or written by anything other than this
+    application, has no role on it. The model declares USER as the default, but a repository
+    reads through `as_pymongo()`, which hands back the document as it is stored and applies
+    no defaults, so the default is applied here instead — at the one place an account is
+    turned into the account of a request.
+
+    Only an absent role becomes USER. A role that is present but unrecognised is handed on
+    as it is, so that the guard refuses it rather than quietly reading a mistake in stored
+    data as permission.
+    """
+    role = account.get("role")
+
+    return USER_ROLE if role is None else role
+
+
 def public_account(account):
-    return {"id": str(account["_id"]), "name": account["name"], "email": account["email"]}
+    return {
+        "id": str(account["_id"]),
+        "name": account["name"],
+        "email": account["email"],
+        "role": account_role(account),
+    }
 
 
 def sign(account):
