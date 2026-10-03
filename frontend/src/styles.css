@@ -34,7 +34,10 @@ body {
 
 .app-shell {
 	display: flex;
-	min-height: 100%;
+	/* 100% of a parent that has only a min-height does not resolve, which left this shell
+	   shrink-wrapped to its content and any centering inside it invisible. vh is definite,
+	   so the shell always fills the window and the main can center what it holds. */
+	min-height: 100vh;
 	flex-direction: column;
 }
 
@@ -70,6 +73,15 @@ body {
 .app-shell-main {
 	flex: 1;
 	padding: 24px;
+}
+
+/* While there is nothing but the sign-in card on the page, put it in the middle
+   rather than up against the top-left corner. flex: 1 above gives this main
+   element the height it needs to center against. */
+.app-shell-main-centered {
+	display: flex;
+	justify-content: center;
+	align-items: center;
 }
 
 .app-shell-summary {

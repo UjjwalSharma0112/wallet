@@ -389,7 +389,7 @@ export default function App() {
 				) : null}
 			</header>
 
-			<main className="app-shell-main">
+			<main className={stage === "signIn" ? "app-shell-main app-shell-main-centered" : "app-shell-main"}>
 				{stage === "booting" ? (
 					<p className="app-shell-summary" role="status">
 						Checking your session…
