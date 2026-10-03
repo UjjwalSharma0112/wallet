@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authApi } from "./features/auth/auth.api.js";
 import { SignInForm } from "./features/auth/SignInForm.jsx";
+import { HomePage } from "./features/home/HomePage.jsx";
 import { MoneyRequestForm } from "./features/money_requests/MoneyRequestForm.jsx";
 import { MoneyRequestList } from "./features/money_requests/MoneyRequestList.jsx";
 import { moneyRequestsApi } from "./features/money_requests/money-requests.api.js";
@@ -9,10 +10,30 @@ import { refundsApi } from "./features/refunds/refunds.api.js";
 import { TransferForm } from "./features/transfers/TransferForm.jsx";
 import { transfersApi } from "./features/transfers/transfers.api.js";
 import { walletApi } from "./features/wallet/wallet.api.js";
-import { WalletBalanceCard } from "./features/wallet/WalletBalanceCard.jsx";
 import { WalletHistoryList } from "./features/wallet/WalletHistoryList.jsx";
 import { formatMinor } from "./features/wallet/wallet-format.js";
 import { hasSessionToken, setSessionToken } from "./shared/api/client.js";
+import { BackButton } from "./shared/ui/BackButton.jsx";
+
+/**
+ * The pages this app can be on, and the two ways into Activity.
+ *
+ * Nothing here fetches. Every page of data is read once when the session is restored and
+ * refreshed by the handlers below, so moving between pages only decides what is drawn over
+ * data already held — which is why Home can show a balance and a preview without asking for
+ * either again.
+ */
+const NAV_PAGES = [
+	{ id: "home", label: "Home" },
+	{ id: "activity", label: "Activity" },
+];
+
+const ACTIVITY_FILTERS = [
+	{ id: "all", label: "All" },
+	{ id: "sent", label: "Sent" },
+	{ id: "received", label: "Received" },
+	{ id: "refunds", label: "Refunds" },
+];
 
 const PAGE_SIZE = 25;
 const EMPTY_HISTORY = { entries: [], total: 0, offset: 0 };
@@ -60,6 +81,12 @@ function refundFieldErrorsFrom(error) {
 export default function App() {
 	const [stage, setStage] = useState("booting");
 	const [account, setAccount] = useState(null);
+	// Which page is on screen. A load lands on Home, which is the dashboard rather than any
+	// one job: Send and Ask are reached from its two actions, and Activity from its own link.
+	const [page, setPage] = useState("home");
+	// Which part of Activity is being read. Separate from the page itself, so leaving and
+	// coming back to Activity returns to the same list rather than resetting it.
+	const [activityFilter, setActivityFilter] = useState("all");
 	const [signIn, setSignIn] = useState({ error: "", loading: false });
 	const [wallet, setWallet] = useState(null);
 	const [walletLoading, setWalletLoading] = useState(false);
@@ -207,6 +234,24 @@ export default function App() {
 			setHistoryLoading(false);
 		}
 	}, [history.entries.length]);
+
+	/**
+	 * Narrow the ledger to one side of it.
+	 *
+	 * Sent and Received are the ledger's own two directions rather than a new kind of row, so
+	 * this is a reading of the movements already held and not a second set of them. The opening
+	 * balance is a credit like any other, so it counts as Received: it did arrive, and it is
+	 * the one row where saying so is accurate rather than approximate.
+	 */
+	const filterEntries = useCallback(
+		(entries) => {
+			if (activityFilter === "sent") return entries.filter((entry) => entry.direction === "DEBIT");
+			if (activityFilter === "received") return entries.filter((entry) => entry.direction === "CREDIT");
+
+			return entries;
+		},
+		[activityFilter],
+	);
 
 	const handleSend = useCallback(
 		async ({ recipientEmail, amountMinor, note, idempotencyKey }) => {
@@ -407,6 +452,7 @@ export default function App() {
 				setSessionToken(result.token);
 				setAccount(result.account);
 				resetWallet();
+				setPage("home");
 				setStage("wallet");
 				await loadWallet();
 			} catch (error) {
@@ -421,6 +467,10 @@ export default function App() {
 		setAccount(null);
 		setSignIn({ error: "", loading: false });
 		resetWallet();
+		// Whoever signs in next starts from the dashboard rather than inheriting the page the
+		// last account happened to be reading.
+		setPage("home");
+		setActivityFilter("all");
 		setStage("signIn");
 	}
 
@@ -457,6 +507,8 @@ export default function App() {
 			setAccount(null);
 			setSignIn({ error: event.detail || "Your session ended. Sign in again.", loading: false });
 			resetWallet();
+			setPage("home");
+			setActivityFilter("all");
 			setStage("signIn");
 		}
 
@@ -473,13 +525,28 @@ export default function App() {
 				</span>
 				<h1 className="app-shell-title">Wallet</h1>
 				{account ? (
-					<div className="app-shell-account">
-						<span className="app-shell-account-name">{account.name}</span>
-						<span className="app-shell-account-email">{account.email}</span>
-						<button className="secondary-button" type="button" onClick={handleSignOut}>
-							Sign out
-						</button>
-					</div>
+					<>
+						<nav className="app-nav" aria-label="Sections">
+							{NAV_PAGES.map((item) => (
+								<button
+									className={page === item.id ? "app-nav-link app-nav-link-current" : "app-nav-link"}
+									key={item.id}
+									type="button"
+									aria-current={page === item.id ? "page" : undefined}
+									onClick={() => setPage(item.id)}
+								>
+									{item.label}
+								</button>
+							))}
+						</nav>
+						<div className="app-shell-account">
+							<span className="app-shell-account-name">{account.name}</span>
+							<span className="app-shell-account-email">{account.email}</span>
+							<button className="secondary-button" type="button" onClick={handleSignOut}>
+								Sign out
+							</button>
+						</div>
+					</>
 				) : null}
 			</header>
 
@@ -494,64 +561,129 @@ export default function App() {
 
 				{stage === "wallet" ? (
 					<div className="wallet-layout">
-						<WalletBalanceCard wallet={wallet} loading={walletLoading} error={walletError} onRetry={loadWallet} />
-						<TransferForm
-							balanceMinor={wallet?.availableBalanceMinor ?? null}
-							onSend={handleSend}
-							loading={transferLoading}
-							error={transfer.error}
-							fieldErrors={transfer.fieldErrors}
-							notice={transfer.notice}
-							resetKey={transfer.resetKey}
-						/>
-						<MoneyRequestForm
-							onAsk={handleAsk}
-							loading={askLoading}
-							error={ask.error}
-							fieldErrors={ask.fieldErrors}
-							notice={ask.notice}
-							resetKey={ask.resetKey}
-						/>
-						<MoneyRequestList
-							requests={requests.requests}
-							total={requests.total}
-							offset={requests.offset}
-							filters={requestFilters}
-							actions={requestActions}
-							loading={requestsLoading}
-							error={requestsError}
-							onFilterChange={handleFilterChange}
-							onApprove={handleApprove}
-							onDecline={handleDecline}
-							onLoadMore={loadMoreRequests}
-							onRetry={loadWallet}
-						/>
-						<RefundsSection
-							entries={history.entries}
-							refunds={refunds.refunds}
-							refundTotal={refunds.total}
-							target={refundTarget}
-							refundLoading={refundLoading}
-							refundError={refund.error}
-							refundFieldErrors={refund.fieldErrors}
-							refundNotice={refund.notice}
-							refundResetKey={refund.resetKey}
-							refundsLoading={refundsLoading}
-							refundsError={refundsError}
-							onSelect={setRefundTarget}
-							onCancel={() => setRefundTarget(null)}
-							onRefund={handleRefund}
-							onRetry={() => loadRefunds()}
-						/>
-						<WalletHistoryList
-							entries={history.entries}
-							total={history.total}
-							offset={history.offset}
-							loading={historyLoading}
-							error={historyError}
-							onLoadMore={loadMore}
-							onRetry={loadWallet}
-						/>
+						{/* The dashboard. It draws the balance card and a short preview of the
+						    ledger, both of which are already held, and offers the two things a
+						    wallet is opened to do. */}
+						<div className="app-page" hidden={page !== "home"}>
+							<HomePage
+								account={account}
+								wallet={wallet}
+								walletLoading={walletLoading}
+								walletError={walletError}
+								onRetryWallet={loadWallet}
+								entries={history.entries}
+								historyTotal={history.total}
+								historyLoading={historyLoading}
+								onSend={() => setPage("send")}
+								onAsk={() => setPage("ask")}
+								onSeeAll={() => setPage("activity")}
+							/>
+						</div>
+
+						{/* One job per page, each with its own way back. The transfer form is
+						    given the balance to quote, exactly as it always has been. */}
+						<div className="app-page" hidden={page !== "send"}>
+							<div className="page-heading">
+								<BackButton onBack={() => setPage("home")} />
+								<h2 className="page-title">Send money</h2>
+							</div>
+
+							<TransferForm
+								balanceMinor={wallet?.availableBalanceMinor ?? null}
+								onSend={handleSend}
+								loading={transferLoading}
+								error={transfer.error}
+								fieldErrors={transfer.fieldErrors}
+								notice={transfer.notice}
+								resetKey={transfer.resetKey}
+							/>
+						</div>
+
+						{/* Asking moves no money, so the list of requests belongs beside the form
+						    that raises them: what you asked, and what you are waiting on. */}
+						<div className="app-page" hidden={page !== "ask"}>
+							<div className="page-heading">
+								<BackButton onBack={() => setPage("home")} />
+								<h2 className="page-title">Ask for money</h2>
+							</div>
+
+							<MoneyRequestForm
+								onAsk={handleAsk}
+								loading={askLoading}
+								error={ask.error}
+								fieldErrors={ask.fieldErrors}
+								notice={ask.notice}
+								resetKey={ask.resetKey}
+							/>
+							<MoneyRequestList
+								requests={requests.requests}
+								total={requests.total}
+								offset={requests.offset}
+								filters={requestFilters}
+								actions={requestActions}
+								loading={requestsLoading}
+								error={requestsError}
+								onFilterChange={handleFilterChange}
+								onApprove={handleApprove}
+								onDecline={handleDecline}
+								onLoadMore={loadMoreRequests}
+								onRetry={loadWallet}
+							/>
+						</div>
+
+						{/* The full register. The four filters are a reading of the same ledger
+						    and the same refunds the wallet already holds, so choosing one
+						    decides what is listed and never asks the service for anything. */}
+						<div className="app-page" hidden={page !== "activity"}>
+							<div className="page-heading">
+								<BackButton onBack={() => setPage("home")} />
+								<h2 className="page-title">Activity</h2>
+							</div>
+
+							<div className="activity-filters" role="group" aria-label="Narrow the activity shown">
+								{ACTIVITY_FILTERS.map((item) => (
+									<button
+										className={activityFilter === item.id ? "request-chip request-chip-on" : "request-chip"}
+										key={item.id}
+										type="button"
+										aria-pressed={activityFilter === item.id}
+										onClick={() => setActivityFilter(item.id)}
+									>
+										{item.label}
+									</button>
+								))}
+							</div>
+
+							{activityFilter === "refunds" ? (
+								<RefundsSection
+									entries={history.entries}
+									refunds={refunds.refunds}
+									refundTotal={refunds.total}
+									target={refundTarget}
+									refundLoading={refundLoading}
+									refundError={refund.error}
+									refundFieldErrors={refund.fieldErrors}
+									refundNotice={refund.notice}
+									refundResetKey={refund.resetKey}
+									refundsLoading={refundsLoading}
+									refundsError={refundsError}
+									onSelect={setRefundTarget}
+									onCancel={() => setRefundTarget(null)}
+									onRefund={handleRefund}
+									onRetry={() => loadRefunds()}
+								/>
+							) : (
+								<WalletHistoryList
+									entries={filterEntries(history.entries)}
+									total={activityFilter === "all" ? history.total : filterEntries(history.entries).length}
+									offset={history.offset}
+									loading={historyLoading}
+									error={historyError}
+									onLoadMore={loadMore}
+									onRetry={loadWallet}
+								/>
+							)}
+						</div>
 					</div>
 				) : null}
 			</main>

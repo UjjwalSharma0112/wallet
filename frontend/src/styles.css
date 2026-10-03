@@ -253,11 +253,13 @@ body {
 	text-transform: uppercase;
 }
 
+/* The one large figure on the page. It is the thing a wallet is opened to check, so it is
+   set well above everything else and given the room to breathe. */
 .wallet-card-amount {
 	margin: 8px 0 20px;
-	font-size: 40px;
+	font-size: 46px;
 	font-weight: 500;
-	letter-spacing: -0.01em;
+	letter-spacing: -0.02em;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -659,9 +661,302 @@ body {
 	font-size: 14px;
 }
 
-@media (max-width: 560px) {
+/* Header navigation. Two pages, so this is a plain row of buttons rather than the pill the
+   request filters use. The page you are on is filled rather than tinted, so it is never in
+   doubt which one is being read. */
+.app-nav {
+	display: flex;
+	gap: 4px;
+	margin-left: 12px;
+}
+
+/* The links are text and nothing else — no pill, no rule, no fill. The padding is left in
+   because it is the tap target, not a visible edge. */
+.app-nav-link {
+	padding: 8px 16px;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 15px;
+	font-weight: 500;
+	transition: color 120ms ease;
+}
+
+.app-nav-link:hover {
+	color: var(--text);
+}
+
+/* The page being read is said with weight and colour alone. The doubled class keeps that
+   ahead of the hover colour above, so the current page does not dim when pointed at. */
+.app-nav-link.app-nav-link-current {
+	color: var(--accent);
+	font-weight: 700;
+}
+
+.app-nav-link:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* A page, and the way back off it. Pages keep their children mounted and are hidden instead,
+   so moving between them never unmounts a half-filled form and never asks for data the app
+   already holds. `display` is set below, and an author display beats the user agent's
+   `[hidden] { display: none }`, so the hidden case has to be asked for explicitly. */
+.app-page {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.app-page[hidden] {
+	display: none;
+}
+
+.page-heading {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.page-title {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 500;
+	letter-spacing: -0.01em;
+}
+
+.back-button {
+	align-self: flex-start;
+	padding: 6px 12px 6px 8px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 14px;
+	transition:
+		border-color 120ms ease,
+		color 120ms ease;
+}
+
+.back-button:hover {
+	border-color: var(--text-muted);
+	color: var(--text);
+}
+
+.back-button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* The dashboard. Generous spacing and one large figure: the balance is the thing being
+   checked, so nothing competes with it. */
+.home-page {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.home-greeting {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 500;
+}
+
+.home-actions {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* A pair of action cards. These navigate rather than submit, so they are buttons with a
+   generous tap target, and each says in one glance which way the money would move. */
+.home-action {
+	display: flex;
+	min-height: 92px;
+	padding: 18px;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-raised);
+	color: var(--text);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 15px;
+	font-weight: 500;
+	transition:
+		background-color 120ms ease,
+		border-color 120ms ease;
+}
+
+.home-action:hover {
+	border-color: var(--accent);
+	background: rgb(63 185 138 / 8%);
+}
+
+.home-action:active {
+	background: rgb(63 185 138 / 14%);
+}
+
+.home-action:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.home-action-icon {
+	display: grid;
+	width: 38px;
+	height: 38px;
+	flex: none;
+	place-items: center;
+	border-radius: 50%;
+	background: rgb(63 185 138 / 14%);
+	color: var(--accent);
+	font-size: 18px;
+}
+
+.home-action-label {
+	text-align: left;
+}
+
+.home-recent {
+	padding: 22px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-raised);
+}
+
+.home-recent-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 6px;
+}
+
+.home-recent-heading {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 500;
+}
+
+/* See all is a real destination, so it is a button that says so rather than a decorative
+   label, and it is only offered when there is something to see. */
+.link-button {
+	padding: 4px 2px;
+	border: none;
+	background: transparent;
+	color: var(--accent);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.link-button:hover {
+	color: #4fd39c;
+}
+
+.link-button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* A movement, in one line: which way it went, who it was with, when, and how much. The icon
+   and the signed amount carry the direction, so the row needs no colour of its own to be
+   read correctly. */
+.activity-list {
+	display: flex;
+	margin: 0;
+	padding: 0;
+	flex-direction: column;
+	list-style: none;
+}
+
+.activity-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 13px 0;
+	border-top: 1px solid var(--border);
+}
+
+.activity-row:first-child {
+	border-top: 0;
+}
+
+.activity-row-icon {
+	display: grid;
+	width: 36px;
+	height: 36px;
+	flex: none;
+	place-items: center;
+	border-radius: 50%;
+	background: #1d2a36;
+	color: var(--text-muted);
+	font-size: 16px;
+}
+
+.activity-row-main {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.activity-row-label {
+	overflow: hidden;
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.activity-row-moment {
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.activity-row-amount {
+	flex: none;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+
+.activity-row-amount-debit {
+	color: var(--text);
+}
+
+.activity-row-skeleton {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
+}
+
+/* The activity filters are the request filter chips again: the app has one pressed pill. */
+.activity-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+@media (max-width: 720px) {
+	/* Below this width the mark, the two pages and the account cannot share a line without
+	   crowding, so the navigation takes its own full-width row under them. */
 	.app-shell-header {
 		flex-wrap: wrap;
+	}
+
+	.app-nav {
+		width: 100%;
+		order: 3;
+		margin-left: 0;
+		justify-content: center;
 	}
 
 	.app-shell-account {
@@ -669,9 +964,17 @@ body {
 		margin-left: 0;
 		justify-content: space-between;
 	}
+}
 
+@media (max-width: 560px) {
 	.wallet-card-amount {
 		font-size: 34px;
+	}
+
+	/* Send and Ask stack, because two tap targets side by side on a phone are too small to
+	   hit without aiming. */
+	.home-actions {
+		grid-template-columns: minmax(0, 1fr);
 	}
 
 	.transfer-row {
