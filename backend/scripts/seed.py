@@ -28,6 +28,7 @@ from apps.auth.models import UserAccount  # noqa: E402
 from apps.shared.mongo import collection, to_dict  # noqa: E402
 from apps.transfers.constants import COMPLETED_STATE  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
+from apps.transfers.models import ensure_transfer_indexes  # noqa: E402
 from apps.transfers.services import execute_transfer  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
 from apps.wallet.repository import derived_balance  # noqa: E402
@@ -117,9 +118,8 @@ def insert_transfers(accounts):
     transfers = []
 
     for row in seed_data.TRANSFER_ROWS:
-        result = execute_transfer(
-            by_email[row["senderEmail"]], row["recipientEmail"], row["amountMinor"], None
-        )
+        # The seed sends no idempotency key, so each seeded transfer is its own operation.
+        result, _ = execute_transfer(by_email[row["senderEmail"]], row["recipientEmail"], row["amountMinor"], None)
         transfer_id = ObjectId(result["transfer"]["id"])
         moment = seeded_at - timedelta(days=row["daysAgo"])
 
@@ -176,6 +176,10 @@ def validate_system_total():
 def ensure_indexes():
     for model in SEEDED_MODELS:
         model.ensure_indexes()
+
+    # The idempotency index is partial and MongoEngine cannot declare one, so the transfers
+    # model creates that one itself. Without it a repeated key would be honoured twice.
+    ensure_transfer_indexes()
 
 
 def seed():

@@ -67,9 +67,13 @@ class TransferTestCase(MongoTestCase):
         )
 
     def send(self, amount_minor, recipient_email=RECIPIENT_EMAIL, note=None):
-        return transfer_services.execute_transfer(
+        # These tests are about what a transfer does, so the outcome flag the view needs is
+        # dropped here and the response is returned on its own.
+        response, _ = transfer_services.execute_transfer(
             self.account_document(self.sender), recipient_email, amount_minor, note
         )
+
+        return response
 
     def balance(self, account):
         return wallet_repository.find_wallet_by_user_id(account.id)["availableBalanceMinor"]

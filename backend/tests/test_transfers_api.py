@@ -197,9 +197,10 @@ class TransferApiTest(MongoTestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(self.error_of(response)["code"], "INSUFFICIENT_FUNDS")
 
-    def test_the_same_request_sent_twice_makes_two_transfers(self):
-        # R2 does not recognise a repeat of a request. Until R3 adds a sender-supplied
-        # idempotency key, each POST is a separate instruction and both are honoured.
+    def test_the_same_request_sent_twice_without_a_key_makes_two_transfers(self):
+        # The idempotency key is optional, so a client that does not send one is left exactly
+        # as R2 left it: each POST is a separate instruction and both are honoured. R3 covers
+        # the client that does send a key, in tests/test_idempotency.py.
         body = {"recipientEmail": RECIPIENT_EMAIL, "amountMinor": 1000}
 
         first = self.send(body)

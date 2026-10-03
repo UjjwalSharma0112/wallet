@@ -27,6 +27,7 @@ from apps.auth.models import UserAccount  # noqa: E402
 from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.auth.services import login  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
+from apps.transfers.models import ensure_transfer_indexes  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
 from apps.wallet.services import create_wallet  # noqa: E402
 
@@ -56,6 +57,14 @@ class MongoTestCase(SimpleTestCase):
 
         for model in APPLICATION_MODELS:
             model.ensure_indexes()
+            # Wiped before the idempotency index is built below, so transfers left behind by
+            # an aborted run cannot stop that index from being created.
+            model.objects.delete()
+
+        # The idempotency index is partial and MongoEngine cannot declare one, so it is
+        # created separately. Tests that assert a key cannot be spent twice are only true
+        # while it exists.
+        ensure_transfer_indexes()
 
     def setUp(self):
         for model in APPLICATION_MODELS:

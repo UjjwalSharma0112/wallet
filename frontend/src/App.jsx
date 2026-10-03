@@ -79,20 +79,28 @@ export default function App() {
 	}, [history.entries.length]);
 
 	const handleSend = useCallback(
-		async ({ recipientEmail, amountMinor, note }) => {
+		async ({ recipientEmail, amountMinor, note, idempotencyKey }) => {
 			setTransferLoading(true);
 			setTransfer((current) => ({ ...current, error: "", fieldErrors: {}, notice: "" }));
 
 			try {
-				const result = await transfersApi.send(recipientEmail, amountMinor, note);
+				const result = await transfersApi.send(recipientEmail, amountMinor, note, idempotencyKey);
 
 				// The service returns the sender's own wallet with the transfer, so the
 				// balance on screen is the balance that actually settled.
 				setWallet(result.wallet);
+
+				// A retry of a request the service had already honoured is told apart here,
+				// so it reads as the transfer it repeated rather than as a new one.
+				const transfer = result.transfer;
+				const settled = transfer.state === "COMPLETED";
+
 				setTransfer((current) => ({
 					error: "",
 					fieldErrors: {},
-					notice: `Sent ${formatMinor(result.transfer.amountMinor)}. New balance ${formatMinor(result.wallet.availableBalanceMinor)}.`,
+					notice: settled
+						? `${result.idempotentReplay ? "Already sent" : "Sent"} ${formatMinor(transfer.amountMinor)}. New balance ${formatMinor(result.wallet.availableBalanceMinor)}.`
+						: `Sending ${formatMinor(transfer.amountMinor)}. It will settle shortly.`,
 					resetKey: current.resetKey + 1,
 				}));
 

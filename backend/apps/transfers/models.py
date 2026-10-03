@@ -1,8 +1,17 @@
 from mongoengine import DateTimeField, IntField, ObjectIdField, StringField
+from pymongo import ASCENDING
 
-from apps.shared.documents import TimestampedDocument
+from apps.shared.documents import TimestampedDocument, ensure_index
 
-from .constants import FAILED_STATE, MAX_NOTE_LENGTH, PENDING_STATE, TRANSFER_FAILURE_CODES, TRANSFER_STATES
+from .constants import (
+    FAILED_STATE,
+    MAX_IDEMPOTENCY_KEY_LENGTH,
+    MAX_NOTE_LENGTH,
+    PENDING_STATE,
+    SENDER_IDEMPOTENCY_INDEX,
+    TRANSFER_FAILURE_CODES,
+    TRANSFER_STATES,
+)
 
 
 class Transfer(TimestampedDocument):
@@ -33,3 +42,33 @@ class Transfer(TimestampedDocument):
     failure_code = StringField(db_field="failureCode", choices=TRANSFER_FAILURE_CODES)
     note = StringField(max_length=MAX_NOTE_LENGTH)
     completed_at = DateTimeField(db_field="completedAt")
+    # The sender's key for this operation, when one was sent. It is held here rather than in
+    # a document of its own so that claiming the key and recording the transfer are the same
+    # write, and so that a key's owner is simply the owner of the transfer that holds it.
+    # A transfer made without a key leaves both fields absent.
+    idempotency_key = StringField(db_field="idempotencyKey", max_length=MAX_IDEMPOTENCY_KEY_LENGTH)
+    # What that key was spent on, compared before any result is replayed. Cleared together
+    # with the key if the transfer fails, so a released key leaves nothing behind.
+    idempotency_fingerprint = StringField(db_field="idempotencyFingerprint")
+    # When a failed transfer gave its key back. Recorded with the failure so that a key that
+    # is free again is explained rather than a mystery.
+    idempotency_key_released_at = DateTimeField(db_field="idempotencyKeyReleasedAt")
+
+
+def ensure_transfer_indexes():
+    """Create every index transfers need, including the one MongoEngine cannot declare.
+
+    `sender_idempotency_unique_idx` is deliberately absent from the model's index list:
+    MongoEngine would create it without the partial expression, which would then limit a
+    sender to one keyless transfer for the life of the database. Only keys that were actually
+    sent take part in it.
+    """
+    Transfer.ensure_indexes()
+
+    ensure_index(
+        Transfer,
+        SENDER_IDEMPOTENCY_INDEX,
+        [("senderUserId", ASCENDING), ("idempotencyKey", ASCENDING)],
+        unique=True,
+        partialFilterExpression={"idempotencyKey": {"$type": "string"}},
+    )

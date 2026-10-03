@@ -1,3 +1,5 @@
+import re
+
 PENDING_STATE = "PENDING"
 COMPLETED_STATE = "COMPLETED"
 FAILED_STATE = "FAILED"
@@ -11,6 +13,20 @@ TRANSFER_FAILURE_CODES = [INSUFFICIENT_FUNDS_CODE, RECIPIENT_UNAVAILABLE_CODE]
 # bounds input rather than funds: affordability is decided by the conditional debit.
 MAX_TRANSFER_MINOR = 10_000_000
 MAX_NOTE_LENGTH = 140
+
+# A sender's idempotency key names one operation. The server never interprets it: it only
+# checks that it can be stored and compared, and that a sender cannot spend it twice.
+MAX_IDEMPOTENCY_KEY_LENGTH = 64
+MIN_IDEMPOTENCY_KEY_LENGTH = 8
+IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
+
+# The version prefix of the canonical request a fingerprint is taken over, so a later change
+# to what counts as the same request cannot silently reclassify a key already in use.
+FINGERPRINT_VERSION = "v1"
+
+# One sender, one key, one transfer. The index is partial so it only covers keys that were
+# actually sent, and it is created by the model because MongoEngine cannot express it.
+SENDER_IDEMPOTENCY_INDEX = "sender_idempotency_unique_idx"
 
 # Transfer attempts an interrupted request may have left behind are completed before a
 # new one starts. The bound keeps a large backlog from stalling a request.
@@ -29,3 +45,24 @@ RECIPIENT_NOT_FOUND_MESSAGE = "No active account with that email can receive mon
 SELF_TRANSFER_MESSAGE = "Enter an email address that belongs to someone else."
 INSUFFICIENT_FUNDS_MESSAGE = "This wallet does not have enough available balance for that amount."
 MOVEMENT_MISSING_MESSAGE = "The recorded balance movement for this transfer could not be found."
+
+# A key that is sent has to be storable and comparable, so its format is checked before
+# anything is written. A key that is not sent is not an error: the route has always honoured
+# a request without one.
+IDEMPOTENCY_KEY_INVALID_CODE = "IDEMPOTENCY_KEY_INVALID"
+IDEMPOTENCY_KEY_INVALID_MESSAGE = (
+    "The Idempotency-Key header must be 8 to 64 characters of letters, numbers, dots, "
+    "underscores, colons or dashes."
+)
+
+# Refused without saying what the key was spent on: the sender knows what they sent, and
+# the original request is not theirs to be told back.
+IDEMPOTENCY_KEY_REUSED_CODE = "IDEMPOTENCY_KEY_REUSED"
+IDEMPOTENCY_KEY_REUSED_MESSAGE = (
+    "That idempotency key has already been used for a different transfer. Use a new key for a new transfer."
+)
+
+# A failed transfer gives its key back, so this is only reached if a key is somehow still
+# attached to one. It is stated rather than answered with a result that never happened.
+TRANSFER_ALREADY_FAILED_CODE = "TRANSFER_ALREADY_FAILED"
+TRANSFER_ALREADY_FAILED_MESSAGE = "That transfer already failed. Send it again with a new idempotency key."

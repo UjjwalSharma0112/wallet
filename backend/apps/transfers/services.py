@@ -5,17 +5,22 @@ transaction. Every write below touches exactly one document and is therefore ato
 its own, and the sequence is arranged so that any interruption leaves a state that can
 be *completed forward* rather than reversed.
 
-Two ideas carry that guarantee:
+Three ideas carry that guarantee:
 
 1. The transfer document is written before any money moves, so an interrupted attempt
    always leaves a record of what it intended.
 2. Each wallet records the balance change it just made in the same atomic write that
    made it. A wallet that has taken money away can therefore always say so, with the
    exact balance it produced, even if the ledger entry for it was never written.
+3. The sender's idempotency key is held on that same document, so a claim on the key and
+   the record of the transfer cannot come apart, and the database refuses a second claim
+   on it.
 
-Because neither fact can be recorded outside the document that holds it, there is no
+Because none of those facts can be recorded outside the document that holds it, there is no
 point at which the system can no longer tell what happened.
 """
+
+import hashlib
 
 from bson import ObjectId
 from mongoengine.errors import NotUniqueError
@@ -37,6 +42,9 @@ from . import repository
 from .constants import (
     COMPLETED_STATE,
     FAILED_STATE,
+    FINGERPRINT_VERSION,
+    IDEMPOTENCY_KEY_REUSED_CODE,
+    IDEMPOTENCY_KEY_REUSED_MESSAGE,
     INSUFFICIENT_FUNDS_CODE,
     INSUFFICIENT_FUNDS_MESSAGE,
     MAX_RECOVERY_PER_ATTEMPT,
@@ -47,6 +55,8 @@ from .constants import (
     RECIPIENT_UNAVAILABLE_CODE,
     SELF_TRANSFER_MESSAGE,
     SENDER_ROLE,
+    TRANSFER_ALREADY_FAILED_CODE,
+    TRANSFER_ALREADY_FAILED_MESSAGE,
 )
 
 
@@ -172,6 +182,8 @@ def recover_in_flight():
     Runs on the transfer path rather than on a schedule, so there is no background
     process to operate. Only transfers old enough that no request can still be working on
     one are touched, so recovery never competes with the request that created a transfer.
+    A retry of an interrupted request reaches its transfer here rather than by driving it
+    itself, which keeps the sweep the one way a transfer is ever finished after the fact.
     """
     for transfer in repository.list_in_flight(MAX_RECOVERY_PER_ATTEMPT):
         try:
@@ -201,31 +213,109 @@ def public_transfer(transfer, viewer_account_id):
     }
 
 
-def execute_transfer(sender_account, recipient_email, amount_minor, note):
-    """Send money from the authenticated account's wallet to another account."""
+def request_fingerprint(recipient_account_id, amount_minor, note):
+    """A digest of what an idempotency key was spent on.
+
+    A key names one request, not one result, so the request it was sent with has to be
+    comparable later: a retry that sends the same key for a different transfer must not be
+    answered with the first one. The recipient is identified by the account it resolved to
+    rather than by the address typed, so two spellings of one address name one operation,
+    and the fields before the note are fixed in shape, so no value in them can imitate a
+    separator. Only a digest is stored, and it is never returned to a client.
+    """
+    canonical = "|".join([FINGERPRINT_VERSION, str(recipient_account_id), str(amount_minor), note or ""])
+
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def transfer_response(sender_account, transfer):
+    """The transfer, with the sender's own wallet as it stands now.
+
+    The balance is read rather than taken from the transfer, because other transfers may
+    have settled since. It is the balance the ledger holds, whether this request moved it
+    or an earlier attempt of the same operation did.
+    """
+    return {
+        "transfer": public_transfer(transfer, sender_account["_id"]),
+        "wallet": public_wallet(find_wallet(sender_account["_id"])),
+    }
+
+
+def replay_response(sender_account, claimed, fingerprint):
+    """Answer a repeated key from the transfer it already produced.
+
+    The stored fingerprint is what says whether this is the same request. A key spent on a
+    different one is refused rather than answered with somebody else's result, and the
+    refusal says nothing about the request that claimed the key.
+
+    A transfer that is still in flight is reported as it is and deliberately not moved on:
+    the recovery sweep is what finishes a transfer a request left behind, and it never
+    touches one young enough for its own request to still be working on it. Reporting is the
+    only thing a replay does, so a transfer is never carried any further by a second
+    attempt at the operation that created it.
+    """
+    if claimed.get("idempotencyFingerprint") != fingerprint:
+        raise AppError(409, IDEMPOTENCY_KEY_REUSED_CODE, IDEMPOTENCY_KEY_REUSED_MESSAGE)
+
+    if claimed["state"] == FAILED_STATE:
+        raise AppError(409, TRANSFER_ALREADY_FAILED_CODE, TRANSFER_ALREADY_FAILED_MESSAGE)
+
+    response = transfer_response(sender_account, claimed)
+    response["idempotentReplay"] = True
+
+    return response, False
+
+
+def execute_transfer(sender_account, recipient_email, amount_minor, note, idempotency_key=None):
+    """Send money from the authenticated account's wallet to another account.
+
+    An idempotency key names this operation for its sender. It is written onto the transfer
+    in the transfer's own insert, so the claim and the record are one atomic write and the
+    database, not this code, decides whether a key has been spent before. A request that
+    sends a key already in use is answered from the transfer that key produced; without a
+    key, every request is its own operation, as it has always been.
+    """
     recover_in_flight()
 
     sender_wallet = find_wallet(sender_account["_id"])
     recipient_account, recipient_wallet = resolve_recipient(recipient_email, sender_account)
+    fingerprint = request_fingerprint(recipient_account["_id"], amount_minor, note) if idempotency_key else None
 
-    transfer = repository.create_transfer(
-        {
-            "sender_user_id": sender_account["_id"],
-            "sender_wallet_id": sender_wallet["_id"],
-            "recipient_user_id": recipient_account["_id"],
-            "recipient_wallet_id": recipient_wallet["_id"],
-            "amount_minor": amount_minor,
-            "state": PENDING_STATE,
-            "note": note or None,
-        }
-    )
+    # Reading first is an optimisation that spares the common retry an insert it would only
+    # have to undo. It is never what makes the key safe: if it finds nothing and another
+    # request claims the key first, the insert below is what refuses this one.
+    claimed = repository.find_by_key(sender_account["_id"], idempotency_key)
+
+    if claimed is not None:
+        return replay_response(sender_account, claimed, fingerprint)
+
+    values = {
+        "sender_user_id": sender_account["_id"],
+        "sender_wallet_id": sender_wallet["_id"],
+        "recipient_user_id": recipient_account["_id"],
+        "recipient_wallet_id": recipient_wallet["_id"],
+        "amount_minor": amount_minor,
+        "state": PENDING_STATE,
+        "note": note or None,
+    }
+
+    if idempotency_key:
+        values["idempotency_key"] = idempotency_key
+        values["idempotency_fingerprint"] = fingerprint
+
+    try:
+        transfer = repository.create_transfer(values)
+    except NotUniqueError:
+        # The only unique index a transfer carries besides its own `_id` is the idempotency
+        # index, so being refused here means this exact key was claimed by a request that
+        # won the race, and its transfer is the answer to this one.
+        return replay_response(
+            sender_account, repository.find_by_key(sender_account["_id"], idempotency_key), fingerprint
+        )
 
     completed = complete_transfer(transfer)
 
-    return {
-        "transfer": public_transfer(completed, sender_account["_id"]),
-        "wallet": public_wallet(find_wallet(sender_account["_id"])),
-    }
+    return transfer_response(sender_account, completed), True
 
 
 def decorate_entries(entries, viewer_account_id):

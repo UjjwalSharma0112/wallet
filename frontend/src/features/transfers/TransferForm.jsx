@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatMinor, parseRupeesToMinor } from "../wallet/wallet-format.js";
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -6,21 +6,39 @@ const NOTE_LIMIT = 140;
 const EMPTY_FORM = { recipientEmail: "", amount: "", note: "" };
 
 /**
+ * A key for one transfer. `randomUUID` is only offered in a secure context, so this falls
+ * back to random bytes rather than failing to send at all when the app is opened over plain
+ * http. Both forms are accepted by the service, which only checks that a key is comparable.
+ */
+function newIdempotencyKey() {
+	if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+
+	return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/**
  * Send money to another account's wallet.
  *
  * The amount is read here so the button can say what will be sent, but the service
  * decides what actually happens: this form never treats a local check as permission to
  * move money. Messages the service returns are shown under the field they came from.
+ *
+ * Each submission carries an idempotency key. It is minted when a valid form is sent and
+ * kept until the money has moved or the request is changed, so a retry after a dropped
+ * connection is the same operation rather than a second payment. Editing any field takes a
+ * new key, because that is a different transfer.
  */
 export function TransferForm({ balanceMinor = null, onSend, loading = false, error = "", fieldErrors = {}, notice = "", resetKey = 0 }) {
 	const [values, setValues] = useState(EMPTY_FORM);
 	const [localErrors, setLocalErrors] = useState({});
 	const [edited, setEdited] = useState({});
+	const idempotencyKey = useRef(null);
 
 	useEffect(() => {
 		setValues(EMPTY_FORM);
 		setLocalErrors({});
 		setEdited({});
+		idempotencyKey.current = null;
 	}, [resetKey]);
 
 	function update(field) {
@@ -30,6 +48,10 @@ export function TransferForm({ balanceMinor = null, onSend, loading = false, err
 			setValues((current) => ({ ...current, [field]: value }));
 			setLocalErrors((current) => ({ ...current, [field]: "" }));
 			setEdited((current) => ({ ...current, [field]: true }));
+
+			// What the money is for has changed, so the key this form was holding no longer
+			// names the transfer being sent.
+			idempotencyKey.current = null;
 		};
 	}
 
@@ -77,8 +99,13 @@ export function TransferForm({ balanceMinor = null, onSend, loading = false, err
 
 		if (!payload) return;
 
+		// The key is only minted once the request is one worth sending, so an unfinished
+		// form never leaves a key behind. It survives a failure on purpose: the same button
+		// pressed again must not send the money twice.
+		idempotencyKey.current ||= newIdempotencyKey();
+
 		setEdited({});
-		onSend(payload);
+		onSend({ ...payload, idempotencyKey: idempotencyKey.current });
 	}
 
 	function messageFor(field) {
