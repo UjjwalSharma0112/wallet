@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content="Digital wallet and peer-to-peer payments" />
+		<meta name="theme-color" content="#0f1720" />
+		<title>Wallet</title>
+		<style>
+			html,
+			body,
+			#root {
+				width: 100%;
+				min-width: 320px;
+				min-height: 100%;
+				margin: 0;
+			}
+			body {
+				background: #0f1720;
+			}
+			.initial-wallet-boot {
+				display: grid;
+				position: fixed;
+				inset: 0;
+				place-content: center;
+				gap: 24px;
+				background: #0f1720;
+				color: #e6edf3;
+				font-family: Arial, sans-serif;
+			}
+			.initial-wallet-brand {
+				display: flex;
+				align-items: center;
+				gap: 13px;
+				font-size: 25px;
+			}
+			.initial-wallet-mark {
+				display: grid;
+				width: 44px;
+				height: 44px;
+				place-items: center;
+				border-radius: 12px;
+				background: linear-gradient(135deg, #1f7a5a 0 70%, #14624a 70%);
+				color: #fff;
+				font-size: 22px;
+				font-weight: 700;
+			}
+			.initial-wallet-progress {
+				width: 154px;
+				height: 3px;
+				margin: 0 auto;
+				overflow: hidden;
+				border-radius: 2px;
+				background: #23303d;
+			}
+			.initial-wallet-progress::after {
+				display: block;
+				width: 42%;
+				height: 100%;
+				border-radius: inherit;
+				background: #3fb98a;
+				content: "";
+				animation: initial-wallet-progress 900ms ease-in-out infinite;
+			}
+			@keyframes initial-wallet-progress {
+				0% {
+					transform: translateX(-110%) scaleX(0.75);
+				}
+				50% {
+					transform: translateX(95%) scaleX(1.15);
+				}
+				100% {
+					transform: translateX(310%) scaleX(0.7);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.initial-wallet-progress::after {
+					animation: none;
+					transform: translateX(70%);
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"><main class="initial-wallet-boot" aria-hidden="true"><div class="initial-wallet-brand"><span class="initial-wallet-mark">W</span><span>Wallet</span></div><div class="initial-wallet-progress"></div></main></div>
+		<script type="module" src="/src/main.jsx"></script>
+	</body>
+</html>

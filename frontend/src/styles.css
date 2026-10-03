@@ -1,0 +1,79 @@
+:root {
+	color-scheme: dark;
+	--surface: #0f1720;
+	--surface-raised: #16202b;
+	--border: #23303d;
+	--text: #e6edf3;
+	--text-muted: #94a3b1;
+	--accent: #3fb98a;
+	--radius: 12px;
+	--font-body: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+	min-height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--surface);
+	color: var(--text);
+	font-family: var(--font-body);
+	font-size: 15px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+	display: flex;
+	min-height: 100%;
+	flex-direction: column;
+}
+
+.app-shell-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 18px 24px;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface-raised);
+}
+
+.app-shell-mark {
+	display: grid;
+	width: 38px;
+	height: 38px;
+	flex: none;
+	place-items: center;
+	border-radius: var(--radius);
+	background: linear-gradient(135deg, #1f7a5a 0 70%, #14624a 70%);
+	color: #ffffff;
+	font-size: 19px;
+	font-weight: 500;
+}
+
+.app-shell-title {
+	margin: 0;
+	font-size: 19px;
+	font-weight: 500;
+	letter-spacing: 0.01em;
+}
+
+.app-shell-main {
+	flex: 1;
+	padding: 24px;
+}
+
+.app-shell-summary {
+	max-width: 60ch;
+	margin: 0;
+	color: var(--text-muted);
+}
