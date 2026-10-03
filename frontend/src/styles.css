@@ -638,6 +638,27 @@ body {
 	margin-top: 5px;
 }
 
+.refund-subheading {
+	margin: 18px 0 6px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--text-muted);
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.history-empty-note {
+	margin: 6px 0 0;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
+.refund-target {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
 @media (max-width: 560px) {
 	.app-shell-header {
 		flex-wrap: wrap;

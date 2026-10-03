@@ -27,6 +27,7 @@ from apps.auth.models import UserAccount  # noqa: E402
 from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.auth.services import login  # noqa: E402
 from apps.money_requests.models import MoneyRequest  # noqa: E402
+from apps.refunds.models import Refund, ensure_refund_indexes  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
 from apps.transfers.models import ensure_transfer_indexes  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
@@ -35,7 +36,7 @@ from apps.wallet.services import create_wallet  # noqa: E402
 TEST_DATABASE_SUFFIX = "_test"
 TEST_PASSWORD = "Wallet@2026"
 TEST_SALT_ROUNDS = 4
-APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest)
+APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest, Refund)
 
 
 def test_database_uri(uri):
@@ -66,6 +67,7 @@ class MongoTestCase(SimpleTestCase):
         # created separately. Tests that assert a key cannot be spent twice are only true
         # while it exists.
         ensure_transfer_indexes()
+        ensure_refund_indexes()
 
     def setUp(self):
         for model in APPLICATION_MODELS:

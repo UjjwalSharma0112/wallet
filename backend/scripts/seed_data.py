@@ -128,4 +128,45 @@ REQUEST_ROWS = [
     },
 ]
 
-BASELINE_COLLECTIONS = ("useraccounts", "wallets", "ledgerentries", "transfers", "moneyrequests")
+# Refunds are seeded through the real refund service too, so the compensating entries are
+# the same ones a request produces and the baseline can prove it. The scenarios are the
+# ones a payee meeting a real payment writes: one full give-back, one partial, and two
+# small corrections against the same transfer. Every row pays from the original
+# recipient's wallet, which is exactly whose balance it debits — the amounts below were
+# chosen so the seeded wallets cover them.
+REFUND_ROWS = [
+    {
+        "originalSenderEmail": "diego.santos@wallet.demo",
+        "originalRecipientEmail": "aarav.mehta@wallet.demo",
+        "originalAmountMinor": 150000,
+        "refundAmountMinor": 150000,
+        "note": "Overcharged invoice",
+        "daysAgo": 3,
+    },
+    {
+        "originalSenderEmail": "aarav.mehta@wallet.demo",
+        "originalRecipientEmail": "fatima.noor@wallet.demo",
+        "originalAmountMinor": 50000,
+        "refundAmountMinor": 20000,
+        "note": "Items missing from the order",
+        "daysAgo": 4,
+    },
+    {
+        "originalSenderEmail": "fatima.noor@wallet.demo",
+        "originalRecipientEmail": "diego.santos@wallet.demo",
+        "originalAmountMinor": 7550,
+        "refundAmountMinor": 1000,
+        "note": "One item returned",
+        "daysAgo": 2,
+    },
+    {
+        "originalSenderEmail": "fatima.noor@wallet.demo",
+        "originalRecipientEmail": "diego.santos@wallet.demo",
+        "originalAmountMinor": 7550,
+        "refundAmountMinor": 2000,
+        "note": "Second item returned",
+        "daysAgo": 1,
+    },
+]
+
+BASELINE_COLLECTIONS = ("useraccounts", "wallets", "ledgerentries", "transfers", "moneyrequests", "refunds")

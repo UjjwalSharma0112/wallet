@@ -32,6 +32,11 @@ FINGERPRINT_VERSION = "v1"
 # handed to the engine by the feature that derived it.
 MONEY_REQUEST_KEY_PREFIX = "money-request:"
 
+# A refund's key for its engine call is derived from the refund, the same way an
+# approval's is derived from the request it is approving: one refund, one movement,
+# however many times the caller retries. Also reserved, also refused from clients.
+REFUND_KEY_PREFIX = "refund:"
+
 # One sender, one key, one transfer. The index is partial so it only covers keys that were
 # actually sent, and it is created by the model because MongoEngine cannot express it.
 SENDER_IDEMPOTENCY_INDEX = "sender_idempotency_unique_idx"
@@ -80,5 +85,5 @@ TRANSFER_ALREADY_FAILED_MESSAGE = "That transfer already failed. Send it again w
 # has to look like.
 IDEMPOTENCY_KEY_RESERVED_CODE = "IDEMPOTENCY_KEY_RESERVED"
 IDEMPOTENCY_KEY_RESERVED_MESSAGE = (
-    f"Idempotency keys starting with '{MONEY_REQUEST_KEY_PREFIX}' are reserved by the wallet and cannot be used."
+    "Idempotency keys starting with 'money-request:' or 'refund:' are reserved by the wallet and cannot be used."
 )

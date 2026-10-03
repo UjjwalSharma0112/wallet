@@ -13,7 +13,10 @@ from .constants import (
     MAX_TRANSFER_MINOR,
     MONEY_REQUEST_KEY_PREFIX,
     MIN_IDEMPOTENCY_KEY_LENGTH,
+    REFUND_KEY_PREFIX,
 )
+
+RESERVED_KEY_PREFIXES = (MONEY_REQUEST_KEY_PREFIX, REFUND_KEY_PREFIX)
 
 IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
 
@@ -52,11 +55,11 @@ def read_idempotency_key(headers):
     here — before the recipient is resolved and before anything is written, so a malformed
     key never reaches the database.
 
-    The one key that is well formed but still refused is one in the namespace the server
-    spends on its own behalf, because an approval derives its key from the request it is
-    approving and a client must not be able to claim that name. This check is only ever
-    reached from an incoming request: a key the server derived is handed to the engine
-    directly and never read back through here.
+    The keys that are well formed but still refused are those in the namespaces the server
+    spends on its own behalf, because an approval and a refund both derive their keys from
+    the record they settle, and a client must not be able to claim those names. This check
+    is only ever reached from an incoming request: a key the server derived is handed to the
+    engine directly and never read back through here.
     """
     raw = headers.get(IDEMPOTENCY_KEY_HEADER)
 
@@ -69,7 +72,7 @@ def read_idempotency_key(headers):
     if not usable or not IDEMPOTENCY_KEY_PATTERN.match(key):
         raise AppError(400, IDEMPOTENCY_KEY_INVALID_CODE, IDEMPOTENCY_KEY_INVALID_MESSAGE)
 
-    if key.startswith(MONEY_REQUEST_KEY_PREFIX):
+    if any(key.startswith(prefix) for prefix in RESERVED_KEY_PREFIXES):
         raise AppError(400, IDEMPOTENCY_KEY_RESERVED_CODE, IDEMPOTENCY_KEY_RESERVED_MESSAGE)
 
     return key

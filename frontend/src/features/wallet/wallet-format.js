@@ -7,6 +7,8 @@ const entryLabels = {
 	OPENING: "Opening balance",
 	TRANSFER_IN: "Received",
 	TRANSFER_OUT: "Sent",
+	REFUND_IN: "Refund received",
+	REFUND_OUT: "Refund sent",
 };
 
 /** Balances arrive as integer paise so no amount is ever stored as a float. */

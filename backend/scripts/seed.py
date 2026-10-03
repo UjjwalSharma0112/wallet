@@ -29,6 +29,9 @@ from apps.money_requests.constants import APPROVED_STATE, DECLINED_STATE, PENDIN
 from apps.money_requests.models import MoneyRequest  # noqa: E402
 from apps.money_requests.repository import expire_for_account  # noqa: E402
 from apps.money_requests.services import approve_request, decline_request  # noqa: E402
+from apps.refunds.models import Refund  # noqa: E402
+from apps.refunds.models import ensure_refund_indexes  # noqa: E402
+from apps.refunds.services import create_refund  # noqa: E402
 from apps.shared.mongo import collection, to_dict  # noqa: E402
 from apps.transfers.constants import COMPLETED_STATE  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
@@ -41,7 +44,7 @@ from scripts import seed_data  # noqa: E402
 
 SEPARATOR = "========================================"
 
-SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest)
+SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest, Refund)
 
 
 def connect():
@@ -233,6 +236,89 @@ def backdate_request(request_id, moment):
     collection(MoneyRequest).update_one({"_id": request_id}, {"$set": changes})
 
 
+def insert_refunds(accounts, transfers):
+    """Seed refunds through the real refund service, so they cannot disagree with it.
+
+    A refund pays from the original transfer's recipient, which is whose wallet it debits,
+    and each is backdated after like every other seeded event. Refund transfers join the
+    validated transfer history rather than being figures written to look like payments.
+    """
+    seeded_at = datetime.now(timezone.utc)
+    by_email = {account.email: to_dict(account) for account in accounts}
+    seeded = []
+
+    for row in seed_data.REFUND_ROWS:
+        sender = by_email[row["originalSenderEmail"]]
+        recipient = by_email[row["originalRecipientEmail"]]
+        original = Transfer.objects(
+            __raw__={"senderUserId": sender["_id"], "recipientUserId": recipient["_id"], "amountMinor": row["originalAmountMinor"]}
+        ).as_pymongo().first()
+
+        if original is None:
+            raise ValueError(f"Seed refund row '{row['note']}' names no seeded transfer.")
+
+        result, _ = create_refund(recipient, str(original["_id"]), row["refundAmountMinor"], row["note"], None)
+        refund_transfer_id = ObjectId(result["transfer"]["id"])
+        transfers.append(refund_transfer_id)
+        moment = seeded_at - timedelta(days=row["daysAgo"])
+        backdate_transfer(refund_transfer_id, moment)
+        backdate_refund(result["refund"]["id"], moment)
+        seeded.append(result["refund"]["id"])
+
+    print(f"  Created {len(seeded)} refunds")
+
+    return seeded
+
+
+def backdate_refund(refund_id, moment):
+    stored = Refund.objects(__raw__={"_id": ObjectId(refund_id)}).as_pymongo().first()
+    changes = {"createdAt": moment, "updatedAt": moment}
+
+    if stored.get("completedAt"):
+        changes["completedAt"] = moment
+
+    collection(Refund).update_one({"_id": ObjectId(refund_id)}, {"$set": changes})
+
+
+def validate_refunds(seeded):
+    """A seeded refund must be completed, paid by a refund transfer of the right original,
+    and inside the original's refundable amount when all of its siblings are counted."""
+    by_original = {}
+
+    for refund_id in seeded:
+        refund = Refund.objects(__raw__={"_id": ObjectId(refund_id)}).as_pymongo().first()
+
+        if refund["state"] != COMPLETED_STATE:
+            raise ValueError(f"Seed refund {refund_id} did not complete.")
+
+        refund_transfer = Transfer.objects(__raw__={"_id": refund["transferId"]}).as_pymongo().first()
+
+        if refund_transfer is None or refund_transfer["state"] != COMPLETED_STATE:
+            raise ValueError(f"Seed refund {refund_id} is recorded without a completed transfer.")
+
+        if refund_transfer.get("refundOf") != refund["originalTransferId"]:
+            raise ValueError(f"Seed refund {refund_id} points at a transfer that did not pay it back.")
+
+        if refund_transfer["amountMinor"] != refund["amountMinor"]:
+            raise ValueError(f"Seed refund {refund_id} and its transfer disagree on amount.")
+
+        legs = LedgerEntry.objects(__raw__={"transactionId": refund["transferId"]}).as_pymongo()
+
+        if {(leg["direction"], leg["kind"]) for leg in legs} != {("DEBIT", "REFUND_OUT"), ("CREDIT", "REFUND_IN")}:
+            raise ValueError(f"Seed refund {refund_id} did not record REFUND_OUT and REFUND_IN legs.")
+
+        by_original.setdefault(refund["originalTransferId"], []).append(refund["amountMinor"])
+
+    for original_id, amounts in by_original.items():
+        original = Transfer.objects(__raw__={"_id": original_id}).as_pymongo().first()
+
+        if sum(amounts) > original["amountMinor"]:
+            raise ValueError(f"Seed refunds exceed the original transfer {original_id}.")
+
+        if (original.get("refundedAmountMinor") or 0) != sum(amounts):
+            raise ValueError(f"Seed refund counter on transfer {original_id} drifted from the completed refunds.")
+
+
 def validate_requests(seeded):
     """A seeded request must be in the state it was seeded as, and must name the right transfer.
 
@@ -284,6 +370,7 @@ def ensure_indexes():
     # The idempotency index is partial and MongoEngine cannot declare one, so the transfers
     # model creates that one itself. Without it a repeated key would be honoured twice.
     ensure_transfer_indexes()
+    ensure_refund_indexes()
 
 
 def seed():
@@ -302,8 +389,10 @@ def seed():
     backdate_opening_entries(wallets)
     transfers = insert_transfers(accounts)
     requests = insert_requests(accounts, transfers)
+    refunds = insert_refunds(accounts, transfers)
     validate_transfers(transfers)
     validate_requests(requests)
+    validate_refunds(refunds)
     validate_wallets(accounts)
     validate_system_total()
     ensure_indexes()

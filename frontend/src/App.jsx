@@ -4,6 +4,8 @@ import { SignInForm } from "./features/auth/SignInForm.jsx";
 import { MoneyRequestForm } from "./features/money_requests/MoneyRequestForm.jsx";
 import { MoneyRequestList } from "./features/money_requests/MoneyRequestList.jsx";
 import { moneyRequestsApi } from "./features/money_requests/money-requests.api.js";
+import { RefundsSection } from "./features/refunds/RefundsSection.jsx";
+import { refundsApi } from "./features/refunds/refunds.api.js";
 import { TransferForm } from "./features/transfers/TransferForm.jsx";
 import { transfersApi } from "./features/transfers/transfers.api.js";
 import { walletApi } from "./features/wallet/wallet.api.js";
@@ -17,6 +19,7 @@ const EMPTY_HISTORY = { entries: [], total: 0, offset: 0 };
 const EMPTY_TRANSFER = { error: "", fieldErrors: {}, notice: "", resetKey: 0 };
 const EMPTY_REQUESTS = { requests: [], total: 0, offset: 0 };
 const EMPTY_FILTERS = { role: "", state: "" };
+const EMPTY_REFUNDS = { refunds: [], total: 0, offset: 0 };
 
 /** Decide which field, if any, a refusal from the service belongs to. */
 function fieldErrorsFrom(error) {
@@ -44,6 +47,16 @@ function requestFieldErrorsFrom(error) {
 	return {};
 }
 
+/**
+ * A refund refusal's field errors are kept as the service named them, so the amount field
+ * of the refund form can show what the server said about that amount.
+ */
+function refundFieldErrorsFrom(error) {
+	if (error.code === "VALIDATION_ERROR" && error.details?.fieldErrors) return error.details.fieldErrors;
+
+	return {};
+}
+
 export default function App() {
 	const [stage, setStage] = useState("booting");
 	const [account, setAccount] = useState(null);
@@ -63,6 +76,12 @@ export default function App() {
 	const [ask, setAsk] = useState(EMPTY_TRANSFER);
 	const [askLoading, setAskLoading] = useState(false);
 	const [requestActions, setRequestActions] = useState({});
+	const [refunds, setRefunds] = useState(EMPTY_REFUNDS);
+	const [refundsLoading, setRefundsLoading] = useState(false);
+	const [refundsError, setRefundsError] = useState("");
+	const [refundTarget, setRefundTarget] = useState(null);
+	const [refund, setRefund] = useState(EMPTY_TRANSFER);
+	const [refundLoading, setRefundLoading] = useState(false);
 	// The filters the list is showing, held as a ref as well as in state. The list needs the
 	// state to mark the pressed chips, but the callbacks that read requests must not be
 	// rebuilt every time a chip changes, or the boot effect that reads the session would run
@@ -84,7 +103,32 @@ export default function App() {
 		setAsk(EMPTY_TRANSFER);
 		setAskLoading(false);
 		setRequestActions({});
+		setRefunds(EMPTY_REFUNDS);
+		setRefundsError("");
+		setRefundTarget(null);
+		setRefund(EMPTY_TRANSFER);
+		setRefundLoading(false);
 	}
+
+	/** Read one page of the caller's own refunds, newest first. */
+	const loadRefunds = useCallback(async (offset = 0) => {
+		setRefundsLoading(true);
+		setRefundsError("");
+
+		try {
+			const page = await refundsApi.list({ limit: PAGE_SIZE, offset });
+
+			setRefunds((current) =>
+				offset
+					? { refunds: [...current.refunds, ...page.refunds], total: page.total, offset: page.offset }
+					: { refunds: page.refunds, total: page.total, offset: page.offset },
+			);
+		} catch (error) {
+			setRefundsError(error.message);
+		} finally {
+			setRefundsLoading(false);
+		}
+	}, []);
 
 	/**
 	 * Read one page of requests, narrowed by the filters currently on screen.
@@ -120,6 +164,7 @@ export default function App() {
 		setWalletError("");
 		setHistoryError("");
 		await loadRequests();
+		await loadRefunds();
 
 		try {
 			const [currentWallet, page] = await Promise.all([walletApi.balance(), walletApi.transactions(PAGE_SIZE, 0)]);
@@ -133,7 +178,7 @@ export default function App() {
 			setWalletLoading(false);
 			setHistoryLoading(false);
 		}
-	}, [loadRequests]);
+	}, [loadRequests, loadRefunds]);
 
 	const handleFilterChange = useCallback(
 		(filters) => {
@@ -303,6 +348,55 @@ export default function App() {
 		[loadRequests],
 	);
 
+	/**
+	 * Give some of a received payment back. The payee's own wallet is what moves, so the
+	 * engine answers with the balance that settled and the transfer that carried it; the
+	 * screen reads both from that answer rather than guessing at them.
+	 */
+	const handleRefund = useCallback(
+		async ({ originalTransferId, amountMinor, note }) => {
+			setRefundLoading(true);
+			setRefund((current) => ({ ...current, error: "", fieldErrors: {}, notice: "" }));
+
+			try {
+				const result = await refundsApi.create(originalTransferId, amountMinor, note);
+
+				setWallet(result.wallet);
+				setRefundTarget(null);
+				setRefund((current) => ({
+					error: "",
+					fieldErrors: {},
+					notice: `Returned ${formatMinor(result.refund.amountMinor)} to ${result.refund.counterparty?.name ?? "the sender"}.`,
+					resetKey: current.resetKey + 1,
+				}));
+
+				const page = await walletApi.transactions(PAGE_SIZE, 0);
+
+				setHistory({ entries: page.entries, total: page.total, offset: page.offset });
+				await loadRefunds();
+			} catch (error) {
+				const reported = refundFieldErrorsFrom(error);
+
+				setRefund((current) => ({
+					...current,
+					error: Object.keys(reported).length ? "" : error.message,
+					fieldErrors: reported,
+				}));
+
+				// A refusal means the refundable total the form was quoting may have changed,
+				// so the register underneath is read again.
+				if (error.code === "REFUND_LIMIT_EXCEEDED" || error.code === "INSUFFICIENT_FUNDS") {
+					const page = await walletApi.transactions(PAGE_SIZE, 0);
+
+					setHistory({ entries: page.entries, total: page.total, offset: page.offset });
+				}
+			} finally {
+				setRefundLoading(false);
+			}
+		},
+		[loadRefunds],
+	);
+
 	const handleSignIn = useCallback(
 		async (email, password) => {
 			setSignIn({ error: "", loading: true });
@@ -431,6 +525,23 @@ export default function App() {
 							onDecline={handleDecline}
 							onLoadMore={loadMoreRequests}
 							onRetry={loadWallet}
+						/>
+						<RefundsSection
+							entries={history.entries}
+							refunds={refunds.refunds}
+							refundTotal={refunds.total}
+							target={refundTarget}
+							refundLoading={refundLoading}
+							refundError={refund.error}
+							refundFieldErrors={refund.fieldErrors}
+							refundNotice={refund.notice}
+							refundResetKey={refund.resetKey}
+							refundsLoading={refundsLoading}
+							refundsError={refundsError}
+							onSelect={setRefundTarget}
+							onCancel={() => setRefundTarget(null)}
+							onRefund={handleRefund}
+							onRetry={() => loadRefunds()}
 						/>
 						<WalletHistoryList
 							entries={history.entries}

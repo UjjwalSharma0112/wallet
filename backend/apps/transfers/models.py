@@ -20,7 +20,8 @@ class Transfer(TimestampedDocument):
     The document is written before any money moves, so an attempt that is interrupted
     always leaves evidence of what it intended. `_id` is the transaction id shared by the
     ledger entries it produces, which makes this document the single record of the
-    operation. A transfer that reaches `COMPLETED` or `FAILED` is never rewritten.
+    operation. A transfer that reaches `COMPLETED` or `FAILED` is never rewritten, except
+    by the refund counter below, which accretes in its own guarded way.
     """
 
     meta = {
@@ -53,6 +54,15 @@ class Transfer(TimestampedDocument):
     # When a failed transfer gave its key back. Recorded with the failure so that a key that
     # is free again is explained rather than a mystery.
     idempotency_key_released_at = DateTimeField(db_field="idempotencyKeyReleasedAt")
+    # How much of the transfer has been paid back. Accretes by the conditional claim a
+    # refund makes, never set any other way, and capped at the original amount by that
+    # claim, so the number a caller reads is the number the ledger shows. Absent on rows
+    # written before refunds existed; every reader treats it as 0 then.
+    refunded_amount_minor = IntField(db_field="refundedAmountMinor", min_value=0)
+    # Present only on a transfer that was created to refund another one. Points at the
+    # original transfer, whose economic fields are never touched. Absent on an ordinary
+    # transfer, and absent on the original of a refund: a refund is not itself refundable.
+    refund_of = ObjectIdField(db_field="refundOf")
 
 
 def ensure_transfer_indexes():
@@ -72,3 +82,7 @@ def ensure_transfer_indexes():
         unique=True,
         partialFilterExpression={"idempotencyKey": {"$type": "string"}},
     )
+
+    # Finds every refund transfer of one original transfer. Sparse, so ordinary
+    # transfers, which carry no refundOf at all, stay out of it.
+    ensure_index(Transfer, "refund_of_idx", [("refundOf", ASCENDING)], sparse=True)

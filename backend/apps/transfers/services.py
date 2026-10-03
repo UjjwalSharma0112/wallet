@@ -33,6 +33,8 @@ from apps.wallet.constants import (
     MOVEMENT_APPLIED,
     MOVEMENT_CREDIT,
     MOVEMENT_DEBIT,
+    REFUND_IN_KIND,
+    REFUND_OUT_KIND,
     TRANSFER_IN_KIND,
     TRANSFER_OUT_KIND,
 )
@@ -120,13 +122,21 @@ def record_leg(transfer, role, movement):
     user_id = transfer["senderUserId"] if role == MOVEMENT_DEBIT else transfer["recipientUserId"]
     wallet_id = transfer["senderWalletId"] if role == MOVEMENT_DEBIT else transfer["recipientWalletId"]
 
+    # A refund transfer moves money back along a transfer that already existed, so its
+    # ledger legs say REFUND rather than TRANSFER. Everything else about the write is
+    # the engine's own.
+    if transfer.get("refundOf"):
+        kind = REFUND_OUT_KIND if role == MOVEMENT_DEBIT else REFUND_IN_KIND
+    else:
+        kind = TRANSFER_OUT_KIND if role == MOVEMENT_DEBIT else TRANSFER_IN_KIND
+
     try:
         wallet_repository.create_entry(
             {
                 "wallet_id": wallet_id,
                 "user_id": user_id,
                 "transaction_id": transfer["_id"],
-                "kind": TRANSFER_OUT_KIND if role == MOVEMENT_DEBIT else TRANSFER_IN_KIND,
+                "kind": kind,
                 "direction": role,
                 "amount_minor": movement["amountMinor"],
                 "balance_after_minor": movement["balanceAfterMinor"],
@@ -266,7 +276,7 @@ def replay_response(sender_account, claimed, fingerprint):
     return response, False
 
 
-def execute_transfer(sender_account, recipient_email, amount_minor, note, idempotency_key=None):
+def execute_transfer(sender_account, recipient_email, amount_minor, note, idempotency_key=None, refund_of=None):
     """Send money from the authenticated account's wallet to another account.
 
     An idempotency key names this operation for its sender. It is written onto the transfer
@@ -274,6 +284,10 @@ def execute_transfer(sender_account, recipient_email, amount_minor, note, idempo
     database, not this code, decides whether a key has been spent before. A request that
     sends a key already in use is answered from the transfer that key produced; without a
     key, every request is its own operation, as it has always been.
+
+    `refund_of` marks the transfer as a refund of another one: the marker lives on the new
+    transfer alone, which is how the original transfer's document is never touched by its
+    own reversal.
     """
     recover_in_flight()
 
@@ -298,6 +312,9 @@ def execute_transfer(sender_account, recipient_email, amount_minor, note, idempo
         "state": PENDING_STATE,
         "note": note or None,
     }
+
+    if refund_of is not None:
+        values["refund_of"] = ObjectId(refund_of)
 
     if idempotency_key:
         values["idempotency_key"] = idempotency_key

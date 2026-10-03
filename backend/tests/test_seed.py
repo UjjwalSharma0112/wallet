@@ -4,6 +4,7 @@ from contextlib import redirect_stdout
 from apps.auth.models import UserAccount
 from apps.money_requests.constants import APPROVED_STATE
 from apps.money_requests.models import MoneyRequest
+from apps.refunds.models import Refund
 from apps.transfers.models import Transfer
 from apps.wallet.models import LedgerEntry, Wallet
 from apps.wallet.repository import derived_balance
@@ -15,9 +16,10 @@ from .base import MongoTestCase
 OPENING_ENTRY_COUNT = len([row for row in seed_data.ACCOUNT_ROWS if row["openingBalanceMinor"] > 0])
 
 # An approved request is paid through the transfer engine rather than written as a figure, so
-# its transfer is part of the seeded history too and the counts below have to include it.
+# its transfer is part of the seeded history too and the counts below have to include it. The
+# same holds for a seeded refund: it pays through the engine, so its transfer counts too.
 APPROVED_REQUEST_COUNT = len([row for row in seed_data.REQUEST_ROWS if row["state"] == APPROVED_STATE])
-SEEDED_TRANSFER_COUNT = len(seed_data.TRANSFER_ROWS) + APPROVED_REQUEST_COUNT
+SEEDED_TRANSFER_COUNT = len(seed_data.TRANSFER_ROWS) + APPROVED_REQUEST_COUNT + len(seed_data.REFUND_ROWS)
 
 
 class SeedTest(MongoTestCase):
@@ -33,6 +35,7 @@ class SeedTest(MongoTestCase):
         self.assertEqual(Transfer.objects.count(), SEEDED_TRANSFER_COUNT)
         self.assertEqual(LedgerEntry.objects.count(), OPENING_ENTRY_COUNT + 2 * SEEDED_TRANSFER_COUNT)
         self.assertEqual(MoneyRequest.objects.count(), len(seed_data.REQUEST_ROWS))
+        self.assertEqual(Refund.objects.count(), len(seed_data.REFUND_ROWS))
 
     def test_two_seed_runs_produce_the_same_baseline(self):
         self.run_seed()

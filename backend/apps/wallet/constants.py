@@ -1,10 +1,12 @@
 CURRENCY = "INR"
 
-ENTRY_KINDS = ["OPENING", "TRANSFER_IN", "TRANSFER_OUT"]
+ENTRY_KINDS = ["OPENING", "TRANSFER_IN", "TRANSFER_OUT", "REFUND_IN", "REFUND_OUT"]
 ENTRY_DIRECTIONS = ["CREDIT", "DEBIT"]
 OPENING_KIND = "OPENING"
 TRANSFER_IN_KIND = "TRANSFER_IN"
 TRANSFER_OUT_KIND = "TRANSFER_OUT"
+REFUND_IN_KIND = "REFUND_IN"
+REFUND_OUT_KIND = "REFUND_OUT"
 
 # Roles recorded on an in-flight balance movement. They mirror the ledger direction
 # the movement will eventually be written as.

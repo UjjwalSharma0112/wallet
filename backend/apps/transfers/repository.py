@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
+from pymongo import ReturnDocument
 
 from apps.shared.mongo import collection, to_dict
 
@@ -61,6 +62,49 @@ def find_transfers_by_ids(transaction_ids):
     rows = collection(Transfer).find({"_id": {"$in": [ObjectId(value) for value in transaction_ids]}})
 
     return {row["_id"]: row for row in rows}
+
+
+def claim_refundable_amount(transfer_id, amount_minor):
+    """Move some of a transfer's refundable capacity to one refund, atomically.
+
+    The guard is the whole rule `sum(refunds) <= original`: the server only adds when the
+    total so far plus this amount stays within the transfer's own amount, no matter what
+    any other request is doing against the same document. A transfer that is not completed
+    is not refunded, so its state is part of the same condition. Rows written before
+    refundedAmountMinor existed read as 0.
+    """
+    conditions = {
+        "_id": ObjectId(transfer_id),
+        "state": COMPLETED_STATE,
+        "$expr": {
+            "$lte": [{"$add": [{"$ifNull": ["$refundedAmountMinor", 0]}, amount_minor]}, "$amountMinor"]
+        },
+    }
+
+    return collection(Transfer).find_one_and_update(
+        conditions,
+        [{"$set": {"refundedAmountMinor": {"$add": [{"$ifNull": ["$refundedAmountMinor", 0]}, amount_minor]}}}],
+        return_document=ReturnDocument.AFTER,
+    )
+
+
+def release_refundable_amount(transfer_id, amount_minor):
+    """Hand a claimed amount back, on a refusal that paid nothing out.
+
+    Only ever called for a claim this same caller made, and the caller proves it by having
+    won the transition that releases, so the counter can never be pushed below the total of
+    refunds that actually settled.
+    """
+    return collection(Transfer).find_one_and_update(
+        {"_id": ObjectId(transfer_id)},
+        {"$inc": {"refundedAmountMinor": -amount_minor}},
+        return_document=ReturnDocument.AFTER,
+    )
+
+
+def count_refund_transfers(original_transfer_id):
+    """How many refund transfers exist for one original, for the cap arithmetic checks."""
+    return collection(Transfer).count_documents({"refundOf": ObjectId(original_transfer_id)})
 
 
 def list_in_flight(limit):
