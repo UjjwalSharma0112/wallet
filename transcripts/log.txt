@@ -1861,3 +1861,155 @@ repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
 worktree=main
 parent_agent=none
 
+## [2026-10-04T23:55:09+05:30] Remove the dead count_refund_transfers helper
+
+User Prompt (verbatim, secrets redacted):
+Remove only the dead `count_refund_transfers()` function from `backend/apps/transfers/repository.py`.
+
+Do NOT make any other code changes.
+
+Agent Response Summary:
+Deleted the single unused function after establishing it had no callers. A search across all 146
+tracked files found only the definition itself, with no reference in any test and no dynamic or
+string-based access. Two modules import that repository as a module object, so I also enumerated
+every function actually called on it to rule out attribute-style dispatch: eight functions are used
+and this was not one of them. The check for whether refundOf was still live turned out to matter,
+because a sparse index named refund_of_idx exists on that field and the user's instruction not to
+touch indexes meant I had to establish the field's status before deleting anything. It is very much
+live: six references in refunds services, one in transfers services, one in the seed script and
+three test assertions, so the field and its index both stay. The change is 3 function lines plus 2
+blank lines, 0 insertions, in 1 file. No import was orphaned, because collection, ObjectId and
+Transfer each retain many other call sites. Django check passed, all 525 tests passed, git diff
+--check was clean, and nothing was committed or pushed.
+
+Actions:
+* confirmed count_refund_transfers has no caller in any of the 146 tracked files, including tests
+* ruled out dynamic dispatch by enumerating the 8 functions actually called on the transfers repository module
+* confirmed refundOf is still read by live code in refunds/services.py, transfers/services.py and scripts/seed.py
+* located the sparse refund_of_idx index on refundOf and left models.py completely untouched
+* verified collection, ObjectId and Transfer remain used after the deletion, so no import is orphaned
+* deleted only the function, its docstring and its two trailing blank lines
+* ran ../.venv/bin/python manage.py check: no issues, exit 0
+* ran ../.venv/bin/python manage.py test: 525 tests, OK, exit 0
+* ran git diff --check: exit 0, and git status --short showing 1 modified file plus the 4 known untracked documents
+* confirmed 0 insertions, 5 deletions, 1 file, and no manifest, lockfile, configuration, seed or model change
+* confirmed HEAD is still eab56a9 with 0 unpushed commits and an empty index, so nothing was committed or pushed
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-05T00:01:58+05:30] Move the refunds service query behind the refunds repository
+
+User Prompt (verbatim, secrets redacted):
+Fix exactly one architecture/code-quality issue in the refunds feature.
+
+Agent Response Summary:
+Moved the one direct Refund.objects query out of refunds/services.py and behind the refunds
+repository, which was the only remaining place in the whole application where a service layer
+touched a model directly. The query reads the refunds recorded against a set of transfer ids so a
+history row can name the reversal that paid it. The selection of which transfer ids matter is
+domain logic and stayed in the service; only the database read moved, which is the same split the
+service already used for find_transfers_by_ids two lines below it. The new repository method follows
+the app's existing conventions: the find_by_* naming of find_by_key, the empty-input guard of both
+find_by_key and the sibling find_transfers_by_ids, and the Refund.objects raw read wrapped in list()
+as list_for_initiator already does. The transferId values pass through uncoerced, because the caller
+reads them from as_pymongo and they are already ObjectIds, so adding a conversion would have been a
+silent behaviour change. Removing the query orphaned the service's only use of the Refund class, so
+its now-unused from .models import went with it; that left the refunds app importing its model in
+repository.py alone, which is how all six sibling apps already work. No test needed changing, because
+the tests assert on outcomes such as refundOf and remainingRefundableMinor rather than on the query
+itself. Django check passed, all 525 tests passed, git diff --check was clean, and nothing was
+committed or pushed.
+
+Actions:
+* read refunds/services.py, refunds/repository.py and both refunds test modules before editing
+* confirmed via AST walk that Refund was referenced in service code only at the query line, so the import would be orphaned
+* confirmed the tests read Refund.objects directly for their own assertions but neither patch the query nor count queries
+* added find_by_transfer_ids to refunds/repository.py, placed with the other read methods
+* replaced the direct query in decorate_entries with a repository call, keeping the domain-side id selection in the service
+* removed the now-unused from .models import Refund from refunds/services.py
+* re-searched the service for direct access: 0 .objects( calls and 0 Refund identifiers remain, with mongoengine.errors.NotUniqueError correctly left in place as exception handling
+* confirmed all seven app services now contain 0 direct .objects( calls
+* ran ../.venv/bin/python manage.py check: no issues, exit 0
+* ran ../.venv/bin/python manage.py test: 525 tests, OK, exit 0
+* ran git diff --check: exit 0, plus git status --short, git diff --stat and git diff in full
+* confirmed 0 files matching manifests, lockfiles, config, seed, models, tests or build config changed, and HEAD is still eab56a9 with an empty index
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-05T00:07:32+05:30] Commit both cleanups and push
+
+User Prompt (verbatim, secrets redacted):
+approved commit changes
+
+Agent Response Summary:
+Committed the two approved cleanups as two commits rather than one, because they are unrelated
+concerns in different apps and each is better independently reviewable and separately revertable:
+b84cb8f removes the unused count_refund_transfers helper from the transfers repository, and 021c8bb
+moves the refunds history query behind the refunds repository. Both were staged by explicit path so
+the four untracked assignment documents could not be swept in, and both commit messages record the
+evidence behind the change rather than just asserting the outcome. Pushed eab56a9..021c8bb and
+re-verified the pushed tip: count_refund_transfers has zero occurrences at HEAD, the refunds service
+has zero .objects calls at HEAD, find_by_transfer_ids is present at HEAD, and the tree is clean, so
+the committed state is byte-for-byte the state that passed manage.py check and all 525 tests. The
+export archive at the new tip is still 252 KB over 170 entries with README and transcripts present and
+all four assignment documents absent. Two items remain open and were reported rather than acted on:
+the exported transcript was two entries behind the source log, and the validation report still
+described both cleanups as unresolved findings.
+
+Actions:
+* staged backend/apps/transfers/repository.py by explicit path and committed it as b84cb8f
+* staged backend/apps/refunds/repository.py and backend/apps/refunds/services.py by explicit path and committed them as 021c8bb
+* confirmed the four untracked assignment documents stayed unstaged across both commits
+* pushed eab56a9..021c8bb to origin/main
+* verified HEAD equals origin/main with 0 unpushed commits and 0 tracked modifications
+* re-verified the cleanups at the pushed tip and rebuilt the export archive at 252 KB over 170 entries
+* reported the two open items, the trailing transcript and the stale validation report, without changing either unasked
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-05T00:08:30+05:30] Refresh the exported transcript and push
+
+User Prompt (verbatim, secrets redacted):
+refresh the transcript and push
+
+Agent Response Summary:
+Refreshed transcripts/log.txt from the source log and pushed it. The source log was appended to
+before the copy was taken, so the export includes the entry for the turn that produced it rather than
+trailing it; the file is byte-identical to the source, LF-only, and its agreement line for this repo
+root is intact. Before exporting, the log was scanned against the two generated secrets from
+backend/.env and against the usual token shapes, and every check came back empty. The copy was
+staged by explicit path so the four untracked assignment documents stayed out, and the result is a
+one-file commit of 124 added lines covering the two cleanup turns and the commit turn.
+
+Actions:
+* appended this turn's entry to the source log before copying, so the export includes it
+* scanned the log against DJANGO_SECRET_KEY and JWT_SECRET from backend/.env, and against long hex runs, Bearer headers, PRIVATE KEY blocks, gh*_ and sk- token shapes: all absent
+* copied the source log to transcripts/log.txt and confirmed it is byte-identical, 130334 bytes, 50 entries, LF only
+* staged transcripts/log.txt by explicit path and confirmed the four untracked documents remained unstaged
+* committed and pushed the refreshed export
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
