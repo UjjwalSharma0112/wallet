@@ -9,11 +9,12 @@
 	--radius: 12px;
 	--font-body: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-	/* One reading column, shared by the header and the main area so the mark, the
-	   navigation, the account, and the page content all line up on the same edges.
-	   `--content-pad` is that gutter on a narrow window and the leftover space divided
-	   into two on a wide one, which centers the column without a wrapper element and
-	   without capping the header's own background, which has to stay full-bleed. The
+	/* One reading column for the page content. The header deliberately does not share
+	   it: an app bar is furniture that belongs to the window, so its mark sits at the
+	   left edge and the account is pushed to the right edge at every width, while the
+	   page below is a column of text that should not sprawl across a wide monitor.
+	   `--content-pad` is that column's gutter on a narrow window and the leftover space
+	   divided into two on a wide one, which centers it without a wrapper element. The
 	   `max()` is what keeps it responsive: once the window is narrower than the column
 	   plus both gutters, the padding stops growing and the content simply fills. */
 	--content-max: 760px;
@@ -57,7 +58,7 @@ body {
 	align-items: center;
 	gap: 12px;
 	padding-block: 18px;
-	padding-inline: var(--content-pad);
+	padding-inline: var(--content-gutter);
 	border-bottom: 1px solid var(--border);
 	background: var(--surface-raised);
 }
