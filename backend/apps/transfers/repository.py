@@ -102,11 +102,6 @@ def release_refundable_amount(transfer_id, amount_minor):
     )
 
 
-def count_refund_transfers(original_transfer_id):
-    """How many refund transfers exist for one original, for the cap arithmetic checks."""
-    return collection(Transfer).count_documents({"refundOf": ObjectId(original_transfer_id)})
-
-
 def list_in_flight(limit):
     """Transfers left pending long enough ago that no request is still working on them."""
     stale_before = datetime.now(timezone.utc) - timedelta(seconds=RECOVERY_AGE_SECONDS)
