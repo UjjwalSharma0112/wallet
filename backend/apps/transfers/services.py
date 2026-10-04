@@ -45,10 +45,13 @@ from .constants import (
     COMPLETED_STATE,
     FAILED_STATE,
     FINGERPRINT_VERSION,
+    IDEMPOTENCY_KEY_CONTENDED_CODE,
+    IDEMPOTENCY_KEY_CONTENDED_MESSAGE,
     IDEMPOTENCY_KEY_REUSED_CODE,
     IDEMPOTENCY_KEY_REUSED_MESSAGE,
     INSUFFICIENT_FUNDS_CODE,
     INSUFFICIENT_FUNDS_MESSAGE,
+    MAX_KEY_CLAIM_ATTEMPTS,
     MAX_RECOVERY_PER_ATTEMPT,
     MOVEMENT_MISSING_MESSAGE,
     PENDING_STATE,
@@ -276,6 +279,61 @@ def replay_response(sender_account, claimed, fingerprint):
     return response, False
 
 
+def claim_or_replay(sender_account, values, idempotency_key, fingerprint):
+    """Spend the sender's key on this transfer, or answer from the one already holding it.
+
+    The claim and the record are the same insert, so the database, not this code, decides
+    whether a key has been spent before. Reading the key first spares the common retry an
+    insert it would only have to undo, but it is never what makes the key safe.
+
+    Being refused an insert means a competing request won that attempt. That request either
+    still holds the key, in which case its transfer is the answer to this one and the next
+    pass hands it back, or it failed, which releases the key and leaves it free to be spent
+    again — in which case the next pass spends it. Both are answered by trying again, and
+    `MAX_KEY_CLAIM_ATTEMPTS` bounds how many times this will race for it, because each refusal
+    is evidence that a competitor was there.
+
+    Returns the transfer to work with and whether this call is the one that created it. A
+    transfer this call did not create has already been settled by whoever did.
+    """
+    for _ in range(MAX_KEY_CLAIM_ATTEMPTS):
+        if idempotency_key:
+            claimed = repository.find_by_key(sender_account["_id"], idempotency_key)
+
+            if claimed is not None:
+                return claimed, False
+
+        try:
+            return repository.create_transfer(values), True
+        except NotUniqueError:
+            # The only unique index a transfer carries besides its own `_id` is the
+            # idempotency index, so this exact key is held by a request that got there
+            # first. Whether it is still holding it is the next pass's question.
+            continue
+
+    # Raced the bound and still nothing holds the key, which means every competitor that
+    # refused this key has since released it. A released key is free, so the attempt is made
+    # once more without racing for it. This insert is not raced either, so it is the last one.
+    try:
+        return repository.create_transfer(values), True
+    except NotUniqueError:
+        # Refused again, so a competitor claimed the key after the last read. The database is
+        # the only thing that knows which transfer that is, and it is the same answer every
+        # earlier pass would have given had the read landed a moment sooner.
+        claimed = repository.find_by_key(sender_account["_id"], idempotency_key)
+
+        if claimed is not None:
+            return claimed, False
+
+        # The key was released again between the refusal and the read. Nothing can be said to
+        # hold it, and the attempt budget is spent, so this is reported as contention rather
+        # than crashed on or looped over: it is a refusal the caller may repeat, and by then
+        # the key is either held by somebody or free. Letting the refusal out instead would
+        # answer a legitimate race with a server error, which is the one thing this must not
+        # do — and a batch item's key is raced by every attempt at that item.
+        raise AppError(409, IDEMPOTENCY_KEY_CONTENDED_CODE, IDEMPOTENCY_KEY_CONTENDED_MESSAGE)
+
+
 def execute_transfer(sender_account, recipient_email, amount_minor, note, idempotency_key=None, refund_of=None):
     """Send money from the authenticated account's wallet to another account.
 
@@ -295,14 +353,6 @@ def execute_transfer(sender_account, recipient_email, amount_minor, note, idempo
     recipient_account, recipient_wallet = resolve_recipient(recipient_email, sender_account)
     fingerprint = request_fingerprint(recipient_account["_id"], amount_minor, note) if idempotency_key else None
 
-    # Reading first is an optimisation that spares the common retry an insert it would only
-    # have to undo. It is never what makes the key safe: if it finds nothing and another
-    # request claims the key first, the insert below is what refuses this one.
-    claimed = repository.find_by_key(sender_account["_id"], idempotency_key)
-
-    if claimed is not None:
-        return replay_response(sender_account, claimed, fingerprint)
-
     values = {
         "sender_user_id": sender_account["_id"],
         "sender_wallet_id": sender_wallet["_id"],
@@ -320,19 +370,12 @@ def execute_transfer(sender_account, recipient_email, amount_minor, note, idempo
         values["idempotency_key"] = idempotency_key
         values["idempotency_fingerprint"] = fingerprint
 
-    try:
-        transfer = repository.create_transfer(values)
-    except NotUniqueError:
-        # The only unique index a transfer carries besides its own `_id` is the idempotency
-        # index, so being refused here means this exact key was claimed by a request that
-        # won the race, and its transfer is the answer to this one.
-        return replay_response(
-            sender_account, repository.find_by_key(sender_account["_id"], idempotency_key), fingerprint
-        )
+    transfer, created = claim_or_replay(sender_account, values, idempotency_key, fingerprint)
 
-    completed = complete_transfer(transfer)
+    if not created:
+        return replay_response(sender_account, transfer, fingerprint)
 
-    return transfer_response(sender_account, completed), True
+    return transfer_response(sender_account, complete_transfer(transfer)), True
 
 
 def decorate_entries(entries, viewer_account_id):

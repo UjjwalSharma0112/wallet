@@ -12,12 +12,18 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 from bson import ObjectId
+from mongoengine.errors import NotUniqueError
 
 from apps.shared.errors import AppError
 from apps.shared.mongo import collection
 from apps.transfers import repository as transfer_repository
 from apps.transfers import services as transfer_services
-from apps.transfers.constants import FAILED_STATE, RECOVERY_AGE_SECONDS
+from apps.transfers.constants import (
+    FAILED_STATE,
+    IDEMPOTENCY_KEY_CONTENDED_CODE,
+    IDEMPOTENCY_KEY_CONTENDED_MESSAGE,
+    RECOVERY_AGE_SECONDS,
+)
 from apps.transfers.models import Transfer
 from apps.wallet import repository as wallet_repository
 from apps.wallet.models import LedgerEntry
@@ -38,6 +44,11 @@ OPENING_ENTRIES = 3
 
 KEY = "transfer-key-0001"
 OTHER_KEY = "transfer-key-0002"
+
+# Captured before any test patches it. Tests that stand in for a competing request really do
+# insert and really do fail a transfer, which they cannot do through the patch without recursing
+# into their own refusal.
+REAL_CREATE_TRANSFER = transfer_repository.create_transfer
 
 
 @contextmanager
@@ -725,6 +736,58 @@ class HttpContractTest(IdempotencyTestCase):
         # The body is checked first, so a client is told about the field it can correct.
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.error_of(response)["code"], "VALIDATION_ERROR")
+
+    def contend_every_claim(self):
+        """Refuse every attempt to claim a key, and release it again each time.
+
+        This is the request that loses the race more times than the engine will race for it:
+        every refusal proves a competing request got there first, and every one of them handed
+        the key back, so nothing is there to answer from. A mock that only refused would leave
+        the key held and be answered by a replay instead, which is a different outcome.
+        """
+
+        def lose_the_claim(values):
+            claimed = REAL_CREATE_TRANSFER(values)
+            transfer_repository.mark_failed(claimed["_id"], "RIVAL_FAILED")
+
+            raise NotUniqueError("lost the claim to a request that then failed")
+
+        return mock.patch.object(transfer_repository, "create_transfer", lose_the_claim)
+
+    def test_a_key_raced_past_the_attempt_budget_answers_409_rather_than_failing(self):
+        # The engine runs out of attempts to race for this key, and nothing holds it. That has to
+        # reach the caller as a refusal it may repeat, because a request answered 500 here would
+        # tell a client its transfer is in an unknown state when in fact nothing was sent.
+        with self.contend_every_claim():
+            response = self.request(self.body(), key=KEY)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(self.error_of(response)["code"], IDEMPOTENCY_KEY_CONTENDED_CODE)
+        self.assertEqual(self.error_of(response)["message"], IDEMPOTENCY_KEY_CONTENDED_MESSAGE)
+        self.assertNotIn("details", self.error_of(response))
+
+    def test_a_refused_for_contention_request_moves_no_money_and_spends_no_key(self):
+        with self.contend_every_claim():
+            self.request(self.body(), key=KEY)
+
+        self.assertEqual(self.balance(self.sender), SENDER_OPENING)
+        self.assertEqual(self.balance(self.recipient), RECIPIENT_OPENING)
+        self.assertEqual(LedgerEntry.objects.count(), OPENING_ENTRIES)
+        self.assertIsNone(self.stored_transfer(), "a refused request must not leave the key spent")
+        self.assertEqual(Transfer.objects(__raw__={"state": "COMPLETED"}).count(), 0)
+
+    def test_the_same_request_answered_again_after_contention_is_accepted(self):
+        # The refusal is only honest if repeating it works, which is the whole reason it is a
+        # refusal: by then the rivals have stopped and the key is free.
+        with self.contend_every_claim():
+            self.assertEqual(self.request(self.body(), key=KEY).status_code, 409)
+
+        retry = self.request(self.body(), key=KEY)
+
+        self.assertEqual(retry.status_code, 201)
+        self.assertEqual(self.balance(self.sender), SENDER_OPENING - 1000)
+        self.assertEqual(self.balance(self.recipient), RECIPIENT_OPENING + 1000)
+        self.assertEqual(Transfer.objects(__raw__={"state": "COMPLETED"}).count(), 1)
 
     def test_a_key_on_a_request_that_is_refused_for_funds_is_not_spent(self):
         response = self.request(self.body(amountMinor=1000000), key=KEY)

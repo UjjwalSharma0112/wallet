@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/v1/", include("apps.transfers.urls")),
     path("api/v1/", include("apps.money_requests.urls")),
     path("api/v1/", include("apps.refunds.urls")),
+    path("api/v1/", include("apps.batch.urls")),
     re_path(r"^api/v1/(?P<path>.*)$", unknown_api_route),
     re_path(r"^.*$", not_found),
 ]

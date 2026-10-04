@@ -179,4 +179,21 @@ REFUND_ROWS = [
     },
 ]
 
-BASELINE_COLLECTIONS = ("useraccounts", "wallets", "ledgerentries", "transfers", "moneyrequests", "refunds")
+BASELINE_COLLECTIONS = ("useraccounts", "wallets", "ledgerentries", "transfers", "moneyrequests", "refunds", "batches")
+
+# A batch that is waiting to be run, owned by Aarav and addressing the other three accounts.
+# Nothing here is paid: the seed deliberately stops one step short of processing, so that
+# running a batch is something the person using the application does rather than something the
+# baseline did for them, and so that no balance in the baseline above has to change to
+# accommodate it. Grace owns no batch, which is what gives the batch list a real empty state.
+BATCH_ROWS = [
+    {
+        "ownerEmail": "aarav.mehta@wallet.demo",
+        "daysAgo": 2,
+        "items": [
+            {"recipientEmail": "fatima.noor@wallet.demo", "amountMinor": 2500, "note": "Shared cab"},
+            {"recipientEmail": "diego.santos@wallet.demo", "amountMinor": 4000, "note": "Tickets"},
+            {"recipientEmail": "grace.obi@wallet.demo", "amountMinor": 1500, "note": "Books"},
+        ],
+    },
+]

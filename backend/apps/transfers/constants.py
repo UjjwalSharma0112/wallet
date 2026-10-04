@@ -37,6 +37,16 @@ MONEY_REQUEST_KEY_PREFIX = "money-request:"
 # however many times the caller retries. Also reserved, also refused from clients.
 REFUND_KEY_PREFIX = "refund:"
 
+# A batch item's key is derived from the batch and the item's own position, for the same
+# reason and with the same result: one payment, however many times the batch is processed.
+# Also reserved, also refused from clients.
+BATCH_KEY_PREFIX = "batch:"
+
+# One request may spend at most this many engine keys before it is answered rather than
+# raced again. Each refusal of an insert proves a competing request won that attempt, so the
+# bound only matters when several requests are spending the same derived key at once.
+MAX_KEY_CLAIM_ATTEMPTS = 2
+
 # One sender, one key, one transfer. The index is partial so it only covers keys that were
 # actually sent, and it is created by the model because MongoEngine cannot express it.
 SENDER_IDEMPOTENCY_INDEX = "sender_idempotency_unique_idx"
@@ -80,10 +90,21 @@ IDEMPOTENCY_KEY_REUSED_MESSAGE = (
 TRANSFER_ALREADY_FAILED_CODE = "TRANSFER_ALREADY_FAILED"
 TRANSFER_ALREADY_FAILED_MESSAGE = "That transfer already failed. Send it again with a new idempotency key."
 
+# Refused because several requests are spending one derived key at once and none of them can
+# be said to have it: every insert was refused by the unique index, and the key was released
+# again before it could be read back. This is contention rather than a fault, so it is answered
+# as a refusal the caller may simply repeat — by then the key is either held or free. It is the
+# one outcome a bounded number of attempts cannot resolve, and it is reported rather than
+# allowed to reach the caller as a server error.
+IDEMPOTENCY_KEY_CONTENDED_CODE = "IDEMPOTENCY_KEY_CONTENDED"
+IDEMPOTENCY_KEY_CONTENDED_MESSAGE = (
+    "Several requests are spending this idempotency key at once. Nothing was sent; send it again."
+)
+
 # A well-formed key in the namespace the server reserves for itself. It is refused for its
 # own sake rather than as a format problem, so the sender is told why rather than what a key
 # has to look like.
 IDEMPOTENCY_KEY_RESERVED_CODE = "IDEMPOTENCY_KEY_RESERVED"
 IDEMPOTENCY_KEY_RESERVED_MESSAGE = (
-    "Idempotency keys starting with 'money-request:' or 'refund:' are reserved by the wallet and cannot be used."
+    "Idempotency keys starting with 'money-request:', 'refund:' or 'batch:' are reserved by the wallet and cannot be used."
 )

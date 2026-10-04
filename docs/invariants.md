@@ -153,6 +153,16 @@ Financially significant and administrative actions that require auditing must pr
 
 The system must not silently perform an auditable operation without recording it.
 
+The set of actions that require auditing is defined by R9, which is currently skipped. While
+it is skipped no action is in that set, so this invariant is held for want of anything to
+apply to rather than by an audit trail being in place. It is **not** satisfied by the absence
+of the requirement, and it becomes mandatory again in full the moment R9 is implemented.
+
+Financially significant actions are separately and unconditionally recorded by R2, R4 and R5:
+each writes a transfer row before any money moves, and that row carries the outcome. Those
+records are the financial record itself rather than an audit trail, and they do not satisfy
+this invariant.
+
 ---
 
 # INV-9 — Wallet/Ledger Consistency
@@ -168,6 +178,10 @@ balance derived from valid ledger activity
 ```
 
 If reconciliation detects a difference, the system must report the inconsistency rather than silently treating the values as equivalent.
+
+The comparison this invariant describes is in scope under R1 and is exercised today: a stored
+balance is compared against the balance its ledger implies. R10, which would surface such a
+difference to a user, is skipped.
 
 ---
 
@@ -198,7 +212,6 @@ This is especially important for:
 - network retries
 - client retries
 - batch retries
-- deferred processing
 
 Retry behavior must be explicitly defined for each financial operation.
 
@@ -252,19 +265,37 @@ Running an analytics query must not:
 
 # INV-15 — Batch Processing Safety
 
-Deferred/batch processing must be safe to retry.
+Batch processing must be safe to retry.
 
 Running a batch operation multiple times must not cause duplicate financial effects.
 
 For example:
 
 ```text
-Process expired request
+Process a batch
         ↓
-already processed
+an item already processed
         ↓
-no second financial operation
+no second financial operation for that item
 ```
+
+An interrupted batch must be recoverable by running it again, and recovery must not become a
+second way of moving money.
+
+This is held by the key each item spends rather than by any lock. `batch:<batch_id>:<position>`
+is derived, never accepted from a caller, so every attempt at one item spends the same key for
+the same operation, and R3's partial unique index then allows exactly one of those attempts to
+create a transfer however many arrive at once. Two consequences fall out of that and are both
+tested:
+
+- an item that has already been paid is answered from the transfer that paid it, so re-running
+  a batch moves nothing;
+- an item that _failed_ gave its key back when it failed, so the same key names a fresh attempt
+  and the payment becomes payable once there is money to pay it with.
+
+Recovery is a second run of the same code, not a second mechanism: a claim on a batch older than
+the grace period is taken over by `reassert_claim`, and every item's key still decides what may
+be spent. There is no worker, queue or scheduler involved.
 
 ---
 
@@ -350,11 +381,25 @@ Refund
 → INV-17
 
 Batch Processing
-→ INV-6
+→ INV-1
+→ INV-2
+→ INV-3
+→ INV-4
+→ INV-7
+→ INV-9
 → INV-11
+→ INV-13
 → INV-15
-→ INV-16
+→ INV-17
+
+Analytics
+→ INV-7
+→ INV-13
+→ INV-14
 ```
+
+`INV-6` and `INV-16` govern the money request lifecycle and are satisfied by R4. They are not
+part of batch processing now that this requirement is not responsible for expiring requests.
 
 An implementation should not simply state that an invariant is satisfied.
 

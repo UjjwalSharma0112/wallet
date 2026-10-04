@@ -27,6 +27,7 @@ from apps.auth.constants import USER_ROLE  # noqa: E402
 from apps.auth.models import UserAccount  # noqa: E402
 from apps.auth.repository import find_active_by_id  # noqa: E402
 from apps.auth.services import login  # noqa: E402
+from apps.batch.models import Batch  # noqa: E402
 from apps.money_requests.models import MoneyRequest  # noqa: E402
 from apps.refunds.models import Refund, ensure_refund_indexes  # noqa: E402
 from apps.shared.mongo import collection  # noqa: E402
@@ -38,7 +39,7 @@ from apps.wallet.services import create_wallet  # noqa: E402
 TEST_DATABASE_SUFFIX = "_test"
 TEST_PASSWORD = "Wallet@2026"
 TEST_SALT_ROUNDS = 4
-APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest, Refund)
+APPLICATION_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest, Refund, Batch)
 
 
 def test_database_uri(uri):

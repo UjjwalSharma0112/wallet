@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authApi } from "./features/auth/auth.api.js";
+import { BatchForm } from "./features/batch/BatchForm.jsx";
+import { BatchList } from "./features/batch/BatchList.jsx";
+import { batchFieldErrors, batchesApi } from "./features/batch/batch.api.js";
 import { SignInForm } from "./features/auth/SignInForm.jsx";
 import { HomePage } from "./features/home/HomePage.jsx";
 import { MoneyRequestForm } from "./features/money_requests/MoneyRequestForm.jsx";
@@ -41,6 +44,7 @@ const EMPTY_TRANSFER = { error: "", fieldErrors: {}, notice: "", resetKey: 0 };
 const EMPTY_REQUESTS = { requests: [], total: 0, offset: 0 };
 const EMPTY_FILTERS = { role: "", state: "" };
 const EMPTY_REFUNDS = { refunds: [], total: 0, offset: 0 };
+const EMPTY_BATCHES = { batches: [], total: 0, offset: 0 };
 
 /** Decide which field, if any, a refusal from the service belongs to. */
 function fieldErrorsFrom(error) {
@@ -66,6 +70,26 @@ function requestFieldErrorsFrom(error) {
 	}
 
 	return {};
+}
+
+/**
+ * A batch refusal's field errors are gathered per row, because the service reports them
+ * against the item they belong to (`items.<n>.<field>`) and a list of payments is corrected
+ * one row at a time. Anything not about an item — the list itself being empty or too long —
+ * is left as the service named it, so it is shown once above the rows rather than pinned to
+ * a row that does not exist.
+ */
+function batchErrorsFrom(error) {
+	if (error.code !== "VALIDATION_ERROR" && error.code !== "BATCH_EMPTY") {
+		return { fieldErrors: {}, itemErrors: {}, error: error.message };
+	}
+
+	const gathered = batchFieldErrors(error.details);
+	const itemErrors = gathered.items;
+
+	// The list's own fault — empty, or longer than the service will hold — is about no row in
+	// particular, so it is shown once rather than left to a row that does not exist.
+	return { fieldErrors: gathered.fieldErrors, itemErrors, error: Object.keys(itemErrors).length ? "" : error.message };
 }
 
 /**
@@ -109,6 +133,12 @@ export default function App() {
 	const [refundTarget, setRefundTarget] = useState(null);
 	const [refund, setRefund] = useState(EMPTY_TRANSFER);
 	const [refundLoading, setRefundLoading] = useState(false);
+	const [batches, setBatches] = useState(EMPTY_BATCHES);
+	const [batchesLoading, setBatchesLoading] = useState(false);
+	const [batchesError, setBatchesError] = useState("");
+	const [batch, setBatch] = useState(EMPTY_TRANSFER);
+	const [batchLoading, setBatchLoading] = useState(false);
+	const [batchRun, setBatchRun] = useState({});
 	// The filters the list is showing, held as a ref as well as in state. The list needs the
 	// state to mark the pressed chips, but the callbacks that read requests must not be
 	// rebuilt every time a chip changes, or the boot effect that reads the session would run
@@ -135,7 +165,32 @@ export default function App() {
 		setRefundTarget(null);
 		setRefund(EMPTY_TRANSFER);
 		setRefundLoading(false);
+		setBatches(EMPTY_BATCHES);
+		setBatchesError("");
+		setBatch(EMPTY_TRANSFER);
+		setBatchLoading(false);
+		setBatchRun({});
 	}
+
+	/** Read one page of the caller's own batches, newest first. */
+	const loadBatches = useCallback(async (offset = 0) => {
+		setBatchesLoading(true);
+		setBatchesError("");
+
+		try {
+			const page = await batchesApi.list({ limit: PAGE_SIZE, offset });
+
+			setBatches((current) =>
+				offset
+					? { batches: [...current.batches, ...page.batches], total: page.total, offset: page.offset }
+					: { batches: page.batches, total: page.total, offset: page.offset },
+			);
+		} catch (error) {
+			setBatchesError(error.message);
+		} finally {
+			setBatchesLoading(false);
+		}
+	}, []);
 
 	/** Read one page of the caller's own refunds, newest first. */
 	const loadRefunds = useCallback(async (offset = 0) => {
@@ -192,6 +247,7 @@ export default function App() {
 		setHistoryError("");
 		await loadRequests();
 		await loadRefunds();
+		await loadBatches();
 
 		try {
 			const [currentWallet, page] = await Promise.all([walletApi.balance(), walletApi.transactions(PAGE_SIZE, 0)]);
@@ -205,7 +261,7 @@ export default function App() {
 			setWalletLoading(false);
 			setHistoryLoading(false);
 		}
-	}, [loadRequests, loadRefunds]);
+	}, [loadRequests, loadRefunds, loadBatches]);
 
 	const handleFilterChange = useCallback(
 		(filters) => {
@@ -219,6 +275,81 @@ export default function App() {
 	const loadMoreRequests = useCallback(() => {
 		loadRequests(undefined, requests.requests.length);
 	}, [loadRequests, requests.requests.length]);
+
+	/**
+	 * Save a list of payments. This moves nothing: the batch is written with every item pending
+	 * and waits until it is run, so the notice says so rather than reporting a payment that has
+	 * not happened. The list is read again rather than having a row pushed onto it here, because
+	 * what the service stored is what a later run will act on.
+	 */
+	const handleSaveBatch = useCallback(
+		async (items) => {
+			setBatchLoading(true);
+			setBatch((current) => ({ ...current, error: "", fieldErrors: {}, itemErrors: {}, notice: "" }));
+
+			try {
+				const created = await batchesApi.create(items);
+
+				setBatch((current) => ({
+					error: "",
+					fieldErrors: {},
+					itemErrors: {},
+					notice: `Saved a batch of ${created.summary.totalItems} payments for ${formatMinor(created.summary.totalAmountMinor)}. Nothing has been sent yet.`,
+					resetKey: current.resetKey + 1,
+				}));
+
+				await loadBatches();
+			} catch (error) {
+				const reported = batchErrorsFrom(error);
+
+				setBatch((current) => ({ ...current, ...reported }));
+			} finally {
+				setBatchLoading(false);
+			}
+		},
+		[loadBatches],
+	);
+
+	/**
+	 * Run a batch, which is what moves the money.
+	 *
+	 * The answer carries the batch as it now stands and the owner's own wallet, so the balance
+	 * on screen is the one that actually settled and every item's outcome is known without a
+	 * second question. The list is read again rather than having the returned batch spliced in,
+	 * because the service's own answer is the one the next run will start from.
+	 *
+	 * Running a batch that has already been run is not a way to pay twice: each item spends a
+	 * key derived from the batch and its own position, so an item that has moved money is
+	 * answered from the transfer that moved it. What the button says is decided by whether there
+	 * is anything left to pay.
+	 */
+	const handleRunBatch = useCallback(
+		async (target) => {
+			setBatchRun((current) => ({ ...current, [target.id]: { loading: true, error: "" } }));
+
+			try {
+				const result = await batchesApi.process(target.id);
+
+				setWallet(result.wallet);
+				setBatchRun((current) => ({ ...current, [target.id]: { loading: false, error: "" } }));
+
+				const page = await walletApi.transactions(PAGE_SIZE, 0);
+
+				setHistory({ entries: page.entries, total: page.total, offset: page.offset });
+				await loadBatches();
+			} catch (error) {
+				// The run may have paid part of the batch before it was refused, so the list is
+				// read again either way; the row that failed keeps its own message on top.
+				setBatchRun((current) => ({ ...current, [target.id]: { loading: false, error: error.message } }));
+				await loadBatches();
+			}
+		},
+		[loadBatches],
+	);
+
+	const loadMoreBatches = useCallback(() => {
+		loadBatches(batches.batches.length);
+	}, [loadBatches, batches.batches.length]);
 
 	const loadMore = useCallback(async () => {
 		setHistoryLoading(true);
@@ -596,6 +727,47 @@ export default function App() {
 								fieldErrors={transfer.fieldErrors}
 								notice={transfer.notice}
 								resetKey={transfer.resetKey}
+							/>
+
+							{/* Paying several people is the same job with a longer list, so it is
+							    reached from here rather than given a place of its own in the
+							    navigation. */}
+							<p className="page-hint">
+								Paying more than one person at a time?{" "}
+								<button className="link-button" type="button" onClick={() => setPage("batch")}>
+									Use a batch
+								</button>
+							</p>
+						</div>
+
+						{/* A batch is a list of payments waiting to be paid, so the list of them
+						    belongs beside the form that writes one: what you have saved, what has
+						    been paid, and what is still to run. */}
+						<div className="app-page" hidden={page !== "batch"}>
+							<div className="page-heading">
+								<BackButton onBack={() => setPage("send")} />
+								<h2 className="page-title">Batch transfer</h2>
+							</div>
+
+							<BatchForm
+								onSave={handleSaveBatch}
+								loading={batchLoading}
+								error={batch.error}
+								itemErrors={batch.itemErrors}
+								notice={batch.notice}
+								resetKey={batch.resetKey}
+							/>
+							<BatchList
+								batches={batches.batches}
+								total={batches.total}
+								offset={batches.offset}
+								loading={batchesLoading}
+								processingId={Object.keys(batchRun).find((id) => batchRun[id].loading) ?? ""}
+								error={batchesError}
+								runError={Object.values(batchRun).find((run) => run.error)?.error ?? ""}
+								onRun={handleRunBatch}
+								onLoadMore={loadMoreBatches}
+								onRetry={() => loadBatches()}
 							/>
 						</div>
 

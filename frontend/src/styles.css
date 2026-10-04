@@ -945,6 +945,127 @@ body {
 	gap: 8px;
 }
 
+/* Batch transfer. The form is the transfer form again with a list of its rows, and the list
+   is the request list again — a batch row reads like a request row, because both are "what
+   was asked for, what has become of it, and how much". Only the per-item breakdown is new:
+   a batch is the one place in the app where a single figure is not the whole story, and the
+   whole point of it is that one payment can fail while the others go through. */
+
+.batch-rows {
+	display: flex;
+	margin: 0;
+	padding: 0;
+	flex-direction: column;
+	gap: 18px;
+	list-style: none;
+}
+
+.batch-row {
+	display: flex;
+	padding: 16px 0 0;
+	flex-direction: column;
+	gap: 12px;
+	border-top: 1px solid var(--border);
+}
+
+.batch-row:first-child {
+	padding-top: 0;
+	border-top: 0;
+}
+
+.batch-summary {
+	color: var(--text-muted);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.batch-items {
+	display: flex;
+	margin: 6px 0 0;
+	padding: 0;
+	flex-direction: column;
+	gap: 1px;
+	list-style: none;
+	background: var(--border);
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.batch-item {
+	display: grid;
+	align-items: baseline;
+	gap: 4px 10px;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	padding: 9px 12px;
+	background: var(--surface);
+	font-size: 14px;
+}
+
+/* A row whose payment did not go is tinted rather than recoloured, so the whole list stays
+   readable at once and a reader can see how much of the batch is affected without counting
+   rows. The word beside the name is what says what happened; the tint only separates it. */
+.batch-item-failed {
+	background: rgb(224 113 94 / 7%);
+}
+
+.batch-item-state {
+	padding: 1px 8px;
+	border-radius: 999px;
+	background: #22303e;
+	color: var(--text-muted);
+	font-size: 11px;
+	letter-spacing: 0.01em;
+}
+
+.batch-item-completed .batch-item-state {
+	background: rgb(63 185 138 / 16%);
+	color: var(--accent);
+}
+
+.batch-item-failed .batch-item-state {
+	background: rgb(224 113 94 / 16%);
+	color: #f0a294;
+}
+
+.batch-item-to {
+	overflow-wrap: anywhere;
+}
+
+.batch-item-amount {
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.batch-item-reason {
+	grid-column: 2 / -1;
+	margin: 0;
+	color: #f0a294;
+	font-size: 13px;
+}
+
+.batch-state-completed {
+	background: rgb(63 185 138 / 16%);
+	color: var(--accent);
+}
+
+.batch-state-failed {
+	background: rgb(224 113 94 / 16%);
+	color: #f0a294;
+}
+
+.batch-state-processing {
+	background: rgb(63 185 138 / 16%);
+	color: #7fdcb6;
+}
+
+/* The way into the batch page is a sentence with the action in it, not a button that looks
+   like a second thing to send. */
+.page-hint {
+	margin: 14px 0 0;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
 @media (max-width: 720px) {
 	/* Below this width the mark, the two pages and the account cannot share a line without
 	   crowding, so the navigation takes its own full-width row under them. */

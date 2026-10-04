@@ -3,6 +3,7 @@ from apps.shared.errors import AppError
 from apps.shared.validation import Errors, read_email, read_number, read_string
 
 from .constants import (
+    BATCH_KEY_PREFIX,
     IDEMPOTENCY_KEY_INVALID_CODE,
     IDEMPOTENCY_KEY_INVALID_MESSAGE,
     IDEMPOTENCY_KEY_PATTERN,
@@ -16,7 +17,7 @@ from .constants import (
     REFUND_KEY_PREFIX,
 )
 
-RESERVED_KEY_PREFIXES = (MONEY_REQUEST_KEY_PREFIX, REFUND_KEY_PREFIX)
+RESERVED_KEY_PREFIXES = (MONEY_REQUEST_KEY_PREFIX, REFUND_KEY_PREFIX, BATCH_KEY_PREFIX)
 
 IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
 
@@ -56,10 +57,10 @@ def read_idempotency_key(headers):
     key never reaches the database.
 
     The keys that are well formed but still refused are those in the namespaces the server
-    spends on its own behalf, because an approval and a refund both derive their keys from
-    the record they settle, and a client must not be able to claim those names. This check
-    is only ever reached from an incoming request: a key the server derived is handed to the
-    engine directly and never read back through here.
+    spends on its own behalf, because an approval, a refund and a batch item each derive their
+    keys from the record they settle, and a client must not be able to claim those names. This
+    check is only ever reached from an incoming request: a key the server derived is handed to
+    the engine directly and never read back through here.
     """
     raw = headers.get(IDEMPOTENCY_KEY_HEADER)
 

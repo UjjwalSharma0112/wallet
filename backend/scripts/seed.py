@@ -37,6 +37,11 @@ from apps.shared.mongo import collection, to_dict  # noqa: E402
 from apps.transfers.constants import COMPLETED_STATE  # noqa: E402
 from apps.transfers.models import Transfer  # noqa: E402
 from apps.transfers.models import ensure_transfer_indexes  # noqa: E402
+from apps.batch.constants import BATCH_KEY_PREFIX  # noqa: E402
+from apps.batch.constants import ITEM_PENDING_STATE as BATCH_ITEM_PENDING  # noqa: E402
+from apps.batch.constants import PENDING_STATE as BATCH_PENDING_STATE  # noqa: E402
+from apps.batch.models import Batch  # noqa: E402
+from apps.batch.services import create_batch  # noqa: E402
 from apps.transfers.services import execute_transfer  # noqa: E402
 from apps.wallet.models import LedgerEntry, Wallet  # noqa: E402
 from apps.wallet.repository import derived_balance  # noqa: E402
@@ -45,7 +50,7 @@ from scripts import seed_data  # noqa: E402
 
 SEPARATOR = "========================================"
 
-SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest, Refund)
+SEEDED_MODELS = (UserAccount, Wallet, LedgerEntry, Transfer, MoneyRequest, Refund, Batch)
 
 
 def connect():
@@ -375,6 +380,78 @@ def validate_requests(seeded):
             raise ValueError(f"Seed money request {request_id} was approved by a transfer of a different amount.")
 
 
+def insert_batches(accounts):
+    """Seed waiting batches through the real service, so a seeded batch is one the
+    application would have written itself.
+
+    Nothing is processed. The service this calls creates a batch and pays nothing, which is
+    exactly the state these rows are for, and it fixes each item's position — the thing an
+    item's idempotency key is derived from — the same way a batch made in the application has
+    it fixed. Backdating the row afterwards is all that is left to do.
+    """
+    seeded_at = datetime.now(timezone.utc)
+    by_email = {account.email: to_dict(account) for account in accounts}
+    seeded = []
+
+    for row in seed_data.BATCH_ROWS:
+        owner = by_email.get(row["ownerEmail"])
+
+        if owner is None:
+            raise ValueError(f"Seed batch names an account that does not exist: {row['ownerEmail']}.")
+
+        items = [
+            {
+                "position": position,
+                "recipient_email": item["recipientEmail"],
+                "amount_minor": item["amountMinor"],
+                "note": item.get("note"),
+            }
+            for position, item in enumerate(row["items"])
+        ]
+
+        batch = create_batch(owner, items)
+        moment = seeded_at - timedelta(days=row["daysAgo"])
+
+        collection(Batch).update_one({"_id": ObjectId(batch["id"])}, {"$set": {"createdAt": moment, "updatedAt": moment}})
+
+        seeded.append(batch["id"])
+
+    print(f"  Recorded {len(seeded)} waiting batch(es)")
+
+    return seeded
+
+
+def validate_batches(seeded):
+    """A seeded batch must be waiting, and must not have moved any money.
+
+    The second half is the part that matters: a batch in the baseline that has already been
+    paid would mean the balances above and the batch list disagreed about the same history.
+    Waiting batches are seeded precisely so that the baseline pays nothing for them.
+    """
+    for batch_id in seeded:
+        batch = Batch.objects(__raw__={"_id": ObjectId(batch_id)}).as_pymongo().first()
+
+        if batch["state"] != BATCH_PENDING_STATE:
+            raise ValueError(f"Seed batch {batch_id} is {batch['state']}, expected {BATCH_PENDING_STATE}.")
+
+        for item in batch["items"]:
+            if item["state"] != BATCH_ITEM_PENDING:
+                raise ValueError(f"Seed batch {batch_id} has an item that was already paid.")
+
+            if item.get("transferId") or item.get("failureCode"):
+                raise ValueError(f"Seed batch {batch_id} has an item that names an outcome.")
+
+    # A batch item's key is what it uses to move money, so no transfer holding one of these is
+    # the direct statement that the seeded batches moved nothing. Approvals and refunds do
+    # spend keys of their own in this baseline, which is why the check is on this prefix alone.
+    spent = Transfer.objects(__raw__={"idempotencyKey": {"$regex": f"^{BATCH_KEY_PREFIX}"}}).as_pymongo()
+
+    if spent:
+        raise ValueError("Seed batches moved money, but the baseline pays nothing for batches.")
+
+    print(f"  Validated {len(seeded)} seeded batch(es) are waiting and have paid nothing")
+
+
 def validate_system_total():
     """Transfers move money between wallets, so the sum of all balances must hold still."""
     wallets = Wallet.objects.as_pymongo()
@@ -412,9 +489,11 @@ def seed():
     transfers = insert_transfers(accounts)
     requests = insert_requests(accounts, transfers)
     refunds = insert_refunds(accounts, transfers)
+    batches = insert_batches(accounts)
     validate_transfers(transfers)
     validate_requests(requests)
     validate_refunds(refunds)
+    validate_batches(batches)
     validate_wallets(accounts)
     validate_roles(accounts)
     validate_system_total()
