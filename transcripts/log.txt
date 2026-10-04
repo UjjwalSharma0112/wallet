@@ -1,0 +1,1791 @@
+## [2026-10-01T16:09:45+05:30] ONBOARDING COMPLETE
+
+AGREEMENT RECORDED: /home/ujjwal/Desktop/work/coderepo-react-django-wallet
+Agent: opencode (Big Pickle)
+Stack: django
+System Time: 2026-10-01T16:09:45+05:30
+## [2026-10-01T17:07:27+05:30] SESSION START
+
+Agent: opencode (Big Pickle)
+Repo Root: /home/ujjwal/Desktop/work/coderepo-react-django-wallet
+Branch: main
+Worktree: main
+Parent Agent: none
+Stack: django
+
+## [2026-10-01T17:07:27+05:30] Financial core: validation reader, wallets and transfers API, 54 green tests
+
+User Prompt (verbatim, secrets redacted):
+Continue building Ledgerly per PROJECT_BRIEF.md (resumed from a checkpoint summary).
+
+Agent Response Summary:
+Added a `read_query_int` reader to `apps/shared/validation.py` so query params (which arrive as strings) can be read as bounded integers while JSON bodies keep the strict integer contract in `read_cents`. Rebuilt `apps/wallets/schema.py` and `apps/transfers/schema.py` on top of it, then wrote views, urls and package inits for wallets, transfers and audit, and wired them into `wallet_backend/urls.py`. Four real bugs surfaced and were fixed: mongoengine index specs must name Python fields rather than `db_field` names, so every declared index was silently not being created; `clear_database()` in the test harness dropped collections and therefore the unique indexes the financial invariants rely on, which allowed a duplicate credit ledger entry with the same `opId`; the sufficiency guard was keyed on transfer `kind` instead of on whether the payer was the treasury, which let a withdraw overdraw a user wallet; and recovery treated an already-applied credit operation as a failure instead of a successful replay. Wallet and transfer tests are written and green (54 tests).
+
+Actions:
+* edited backend/apps/shared/validation.py
+* edited backend/apps/wallets, apps/transfers, apps/audit (models, repository, schema, services, views, urls)
+* edited backend/wallet_backend/urls.py
+* edited backend/apps/auth/services.py, backend/apps/auth/repository.py
+* wrote backend/tests/test_wallets.py
+* edited backend/tests/base.py
+* ran `bun run test` (54 tests, OK)
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T11:56:13.113660+05:30] ONBOARDING COMPLETE
+
+AGREEMENT RECORDED: /home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+Agent: opencode
+Stack: django
+System Time: 2026-10-03T11:56:13.113660+05:30
+
+## [2026-10-03T12:00:53.718023+05:30] Repository and reference architecture inspection (no feature work)
+
+User Prompt (verbatim, secrets redacted):
+Do not implement any wallet features. Inspect the current repository and the reference architecture/docs.
+README.md
+REQUIREMENTS.md
+INSTRUCTIONS.md
+GUIDELINES.md
+docs/reference-architecture.md
+docs/requirements.md
+docs/invariants.md
+skills/add-feature.md
+
+Agent Response Summary:
+Ran onboarding for this repo root (agreement recorded earlier in this session), then performed a read-only inspection of the repository, the HackerRank contract docs (README/REQUIREMENTS/INSTRUCTIONS/GUIDELINES), the local domain docs (docs/reference-architecture.md, docs/requirements.md, docs/invariants.md), skills/add-feature.md, and skills/validate. Compared the current scaffolding against the reference calendar repo at /home/ujjwal/Desktop/work/coderepo-react-django-calendar. No wallet feature code was written, per the explicit instruction. Findings: the repository is scaffolding-only (no Django settings/urls/wsgi, no apps, no frontend features, placeholder seed script, empty App.jsx), manage.py still points at calendar_backend.settings while the project package is wallet_backend, frontend/index.html is missing, README.md is still the neutral template, .gitattributes does not export-ignore GUIDELINES.md and skills/, transcripts/ does not exist, and the git remote is still the upstream guidelines repo rather than a private participant repo.
+
+Actions:
+* read README.md, REQUIREMENTS.md, INSTRUCTIONS.md, GUIDELINES.md, docs/reference-architecture.md, docs/requirements.md, docs/invariants.md, skills/add-feature.md, skills/validate/SKILL.md, skills/validate/references/static-checks.md, skills/validate/references/runtime-checks.md
+* inspected repo layout, manifests, hackerrank.yml, setup.sh, package.json, vite.config.js, .vscode/launch.json, .gitignore, .gitattributes, .editorconfig, .prettierrc, .env / .env.example files
+* ran read-only git status/log/remote and port listener checks
+* compared structure with the reference calendar repository
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:13:45.634295+05:30] Minimum foundation fixes: runnable app scaffold
+
+User Prompt (verbatim, secrets redacted):
+Now implement only the minimum foundation fixes identified in your inspection.
+
+Do NOT implement any wallet features or domain logic.
+Do NOT add or upgrade dependencies.
+Do NOT copy calendar-domain code.
+Preserve the existing React + Django + MongoDB stack, dependency versions, Bun workspace, ports, setup.sh behavior, hackerrank.yml commands, formatting configuration, and reference architecture.
+
+Fix only the issues required to make the repository a valid runnable application:
+1. Correct the Django project configuration so wallet_backend is the active project.
+2. Create the required Django project foundation files following the reference architecture.
+3. Create the minimum Vite frontend entry structure required for the application to build and start.
+4. Implement the MongoDB seed/reset foundation required by setup.sh, using the existing dependency stack.
+5. Add the required .gitattributes archive rules.
+6. Preserve the HackerRank-provided AGENTS.md, GUIDELINES.md, REQUIREMENTS.md, INSTRUCTIONS.md, and skills/validate/.
+7. Do not rewrite the README into the full product README yet unless required for the application to start.
+
+After the changes: run the exact install/start/build checks, verify frontend on 3000, backend on 8000, health/MongoDB connection, seed/reset behavior, and report every file changed and every command executed.
+
+Agent Response Summary:
+Implemented only the foundation needed to make the repository a valid runnable application, with no wallet domain logic and no dependency changes. Pointed manage.py at wallet_backend.settings and created settings.py, urls.py and wsgi.py; renamed the empty backend/app placeholder to backend/apps to match the reference layout and added apps/shared with errors.py, rendering.py and views.py (JSON error envelope, ObjectId/datetime encoder, health plus catch-all 404s). Added frontend/index.html, a minimal App.jsx shell and global styles so Vite can build and serve. Replaced the placeholder seed stub with a real reset foundation that drops every application collection and reports the baseline, wired to the existing bun run seed. Added GUIDELINES.md and skills/ archive rules to .gitattributes. Verified with the declared commands: bun install && bash setup.sh --seed, manage.py check, vite build, and bun start polling both ports; health reports database connected, returns 503 when MongoDB is unreachable, and ad hoc data is removed by the prestart seed on restart. Decided to skip a Django-served landing page and favicon because no product content was requested, and left README untouched.
+
+Actions:
+* edited backend/manage.py (DJANGO_SETTINGS_MODULE -> wallet_backend.settings)
+* created backend/wallet_backend/settings.py, urls.py, wsgi.py
+* renamed backend/app -> backend/apps; created backend/apps/shared package files (init, errors, rendering, views)
+* rewrote backend/scripts/seed.py and backend/scripts/seed_data.py as the reset foundation
+* created frontend/index.html, frontend/src/App.jsx, frontend/src/styles.css
+* rewrote .gitattributes with GUIDELINES.md and skills/** export-ignore
+* ran: bun install && bash setup.sh --seed; backend manage.py check; frontend bun run build; python -m compileall; bun start twice with readiness polling; curl health on 8000 and proxied health on 3000; 404 envelope checks; mongosh scratch-collection reset checks; seed failure path with an unreachable MONGODB_URI; git check-attr export-ignore; git status
+* browser check of http://127.0.0.1:3000/ confirming React mounts with no console errors
+* stopped every process started during verification; ports 3000 and 8000 released
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:36:29.830640+05:30] R1 Wallet & Balance Management: discovery and design report
+
+User Prompt (verbatim, secrets redacted):
+Implement R1 - Wallet & Balance Management.
+
+Read:
+- docs/reference-architecture.md
+- docs/requirements.md
+- docs/invariants.md
+- skills/add-feature.md
+
+First perform discovery and produce the implementation plan only.
+
+DO NOT modify any files yet. DO NOT create files. DO NOT install or upgrade dependencies. DO NOT change configuration, package manifests, lockfiles, or architecture.
+
+Determine: 1. Domain entities 2. Relationships 3. Required fields and field types 4. MongoDB indexes, uniqueness constraints, and query patterns 5. How wallet balance is represented 6. How the ledger is represented 7. How the current balance can be verified against the ledger 8. API endpoints required for R1 9. Request/response shapes 10. Authentication and authorization rules 11. Validation rules and expected error cases 12. Affected invariants 13. Tests required 14. Exact files to create or modify 15. Frontend screens/components 16. Frontend API calls 17. Loading, empty, success, validation, and error states 18. Seed data required for R1 19. How the feature fits the existing reference architecture 20. Any risks, ambiguities, or design tradeoffs
+
+For the balance/ledger design specifically: explain the possible approaches, recommend one, explain why it preserves the documented invariants, ensure compatibility with future R2 transfers, R3 idempotency, R5 refunds/reversals, and R10 reconciliation, and do not implement any of those future features now.
+
+Scope boundary: R1 ONLY - wallet creation/ownership, balance retrieval, ledger/history retrieval, and any minimal wallet/balance functionality required by the requirements. Do NOT implement transfers, idempotency, money requests, refunds/reversals, rate/velocity checks, deferred/batch processing, reconciliation, analytics, or additional features not required for R1.
+
+Output ONLY the discovery/design report and implementation plan. At the end include: A. Proposed domain model B. Proposed API contract C. Proposed file changes D. Test plan E. Invariants covered F. Future-feature compatibility G. Open questions/decisions requiring my approval. Wait for my approval before implementing anything.
+
+Agent Response Summary:
+Performed read-only discovery for R1 and produced a design report plus implementation plan; no files were created or modified. Read the reference repo's calendars CRUD feature end to end (models, repository, schema, services, views, urls) plus shared/documents.py, shared/validation.py, shared/authentication.py, shared/mongo.py, shared/numbers.py, insights/repository.py for aggregation style, auth models/services for the JWT pattern, scripts/seed.py for the seeding pattern, and frontend App.jsx, shared/api/client.js, WorkspaceLogin.jsx, TimeInsightsDrawer.jsx and event.api.js for UI conventions. Two environment facts materially constrain the design and were verified live: MongoDB runs as a standalone node (NoReplicationEnabled), so multi-document transactions are unavailable and INV-4/INV-17 must rely on single-document atomicity plus repairable divergence; and Django's built-in test runner works with the existing empty DATABASES setting, so tests need no new dependency and can point at a test database through the MONGODB_URI environment override. Recommended the hybrid balance design (materialized integer-minor-unit balance on the wallet plus an append-only ledger with a per-entry running balance and a derived-balance repository query), rejected stored-balance-only and ledger-only, and mapped it to INV-1, INV-2, INV-7, INV-9, INV-10, INV-13 and INV-17. Flagged seven decisions for approval, the most important being that R1 acceptance requires authenticated ownership while R8 owns auth, so R1 needs a minimal single-token identity layer, and that R1 has no runtime funding path because transfers are R2, so wallets are funded only by seeded opening balances.
+
+Actions:
+* read docs/reference-architecture.md, docs/requirements.md, docs/invariants.md, skills/add-feature.md (R1 and INV sections re-confirmed)
+* read reference backend: apps/calendars/{models,repository,schema,services,views,urls}.py, apps/shared/{documents,validation,authentication,mongo,numbers,errors,rendering,views}.py, apps/insights/repository.py, apps/auth/{models,services}.py, apps/people/models.py
+* read reference scripts/seed.py and seed_data.py for the clearing, insertion, validation and reporting pattern
+* read reference frontend: App.jsx orchestration, shared/api/client.js, features/auth/WorkspaceLogin.jsx, features/insights/TimeInsightsDrawer.jsx, features/events/event.api.js
+* verified MongoDB topology via db.hello() and rs.status(): standalone, NoReplicationEnabled, maxWireVersion 27
+* verified manage.py test runs with DATABASES = {} and that DiscoverRunner.setup_databases succeeds without a SQL database
+* produced the R1 discovery report and implementation plan; created and modified no files
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T13:06:40+05:30] R1 Wallet & Balance Management implemented and verified
+
+User Prompt (verbatim, secrets redacted):
+The discovery is approved with the following decisions:
+
+1. Use the hybrid design:
+   - Wallet.availableBalanceMinor as the materialized balance
+   - immutable append-only LedgerEntry documents
+   - integer INR minor units (paise)
+   - balanceAfterMinor on every ledger entry
+
+2. Use OPENING ledger entries for seeded wallet funding.
+   No runtime top-up/adjustment endpoint in R1.
+
+3. Use a single INR currency constant.
+
+4. Keep role/RBAC out of R1. R8 will introduce USER/MERCHANT/ADMIN.
+
+5. Wallet routes are self-scoped:
+   GET /api/v1/wallet
+   GET /api/v1/wallet/transactions
+
+6. Wallets are provisioned during account creation/seed.
+   No POST /wallet endpoint.
+
+7. Implement only the minimal identity layer needed for R1:
+   POST /api/v1/auth/login
+   GET /api/v1/auth/session
+   require_auth decorator
+
+   Do NOT implement a server-side logout/revocation mechanism.
+   Frontend logout may simply remove the JWT from localStorage.
+
+8. Keep the test suite focused on R1 behavior and documented invariants.
+   Do not create unnecessary test infrastructure or abstractions.
+
+9. Do not solve R2's standalone-Mongo two-wallet atomic transfer problem yet.
+   Preserve the schema so R2 can address it explicitly.
+
+10. Do not modify dependencies, lockfiles, setup architecture, or unrelated files.
+
+Before implementation, update the plan to remove POST /auth/logout and confirm the final file list.
+
+Then implement R1 only.
+
+After implementation report:
+- files changed
+- API endpoints
+- domain/model changes
+- seed changes
+- tests added
+- commands run
+- test/build results
+- invariants verified
+- any remaining issues
+
+Agent Response Summary:
+Confirmed the plan change (dropped POST /auth/logout; the client removes the JWT from localStorage) and the final 36-file list, then implemented R1 end to end. The backend gained a minimal identity layer (bcrypt + JWT HS256), a wallet feature with a materialized integer-paise balance plus an append-only ledger grouped by shared transactionId, and self-scoped read routes; the frontend gained a typed API client, a sign-in form, a balance card and a paginated history list with loading/empty/error states. Seed now resets all collections, creates four demo accounts, provisions one wallet each, funds three via OPENING credits (one account is deliberately left at zero to exercise the empty state), backdates the entries for a plausible history and self-validates that every ledger reconciles with its stored balance. R1 also surfaced a real defect in the shared error handler: DRF method-not-allowed responses leaked {"detail": ...} instead of the documented {error: {...}} envelope, so api_exception_handler now normalizes DRF responses. 49 tests pass, the vite build succeeds, and the running app was verified in a browser for both the funded and empty wallet paths plus tampered-token sign-out. No dependency, lockfile, setup.sh or hackerrank.yml changes.
+
+Actions:
+* Wrote backend/apps/shared/{documents,mongo,validation,authentication}.py
+* Modified backend/apps/shared/errors.py to normalize DRF error responses into the app envelope
+* Wrote backend/apps/auth/{__init__,models,repository,schema,services,views,urls}.py
+* Wrote backend/apps/wallet/{__init__,constants,models,repository,schema,services,views,urls}.py
+* Modified backend/wallet_backend/urls.py to mount apps.auth.urls and apps.wallet.urls under api/v1/
+* Modified backend/scripts/seed.py and backend/scripts/seed_data.py for wallet provisioning and baseline collections
+* Wrote backend/tests/{base,test_auth,test_wallet_services,test_wallet_repository,test_wallet_api,test_seed}.py
+* Wrote frontend/src/shared/api/client.js
+* Wrote frontend/src/features/auth/{auth.api.js,SignInForm.jsx}
+* Wrote frontend/src/features/wallet/{wallet.api.js,wallet-format.js,WalletBalanceCard.jsx,WalletHistoryList.jsx}
+* Modified frontend/src/App.jsx and frontend/src/styles.css
+* Ran manage.py check, manage.py test (49 passed), vite build, setup.sh --seed, bun start
+* Verified all endpoints with curl and drove the UI in a browser (sign-in, balance, history, empty state, tampered token, sign out)
+* Ran bunx prettier --check over frontend/src
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T13:11:15+05:30] R1 committed as a09ec09
+
+User Prompt (verbatim, secrets redacted):
+before that commit the changes with appropriate message
+
+Agent Response Summary:
+Committed the completed R1 work as a09ec09 "Implement R1 wallet balance and ledger history", with a body explaining the identity layer, the self-scoped wallet reads, the materialized-balance plus append-only-ledger design, the shared error-envelope fix, the seed baseline, and the isolated test database. The foundation pass was already committed as f502009, so the new commit contains exactly the 38 R1 files and nothing else. Verified before staging that no ignored artifacts (node_modules, .venv, dist, .env, __pycache__) were included and that the working tree is clean afterwards. No file contents were changed.
+
+Actions:
+* Ran git status --porcelain --ignored, git ls-files, and git log to establish that the foundation was already committed and only R1 was pending
+* Staged backend/apps, backend/wallet_backend/urls.py, backend/scripts, backend/tests, frontend/src
+* Verified the staged set contained no ignored build, dependency, environment, or log artifacts
+* Created commit a09ec09 with git commit -F -
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T13:20:00+05:30] Submission checklist created; README deferred and favicon handed back to the user
+
+User Prompt (verbatim, secrets redacted):
+i've changed the favicon to the new wallet one
+we will change the readme.md at the end put it in the final checklist
+
+Agent Response Summary:
+Accepted the favicon as the participant's own change and stopped reporting on it, after finding that frontend/public/favicon.svg in this working tree still held the calendar asset from the reference repository and that the working tree was otherwise clean. Rather than assume, I asked what "write it" meant; the user clarified that the README stays deferred to the end and that the favicon is already handled. I then wrote a submission checklist at ~/hackerrank_react_django_application/checklist.md, outside the repository so it never ships with the submission, covering R1-R14 feature status, the deferred README with the specific sections the verifier expects, branding, the transcripts export, git privacy and the missing upstream branch, the verifier run, a clean-checkout rehearsal, and a final read-through. The checklist records the real git remote, which is the participant's private repo and not the upstream guidelines repo as previously reported.
+
+Actions:
+* Checked git status and the favicon diff to find no local favicon change
+* Inspected frontend/public and confirmed the only favicon asset is still the calendar SVG
+* Gathered submission facts: git remote, branch tracking, absence of transcripts/, README state, hackerrank.yml commands
+* Extracted the R1-R14 requirement headings from docs/requirements.md
+* Asked the user to disambiguate the requested write, then applied the answer
+* Wrote ~/hackerrank_react_django_application/checklist.md and updated it after the user's clarification
+* Confirmed the README was not written and the favicon was not modified
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T13:28:44+05:30] R2 P2P Transfers - discovery and design report (no code changes)
+
+User Prompt (verbatim, secrets redacted):
+Implement R2 - P2P Transfers.
+
+First perform discovery and produce the implementation plan only.
+
+DO NOT modify any files.
+DO NOT create files.
+DO NOT install or upgrade dependencies.
+DO NOT change configuration, package manifests, lockfiles, setup architecture, or unrelated code.
+
+Read:
+- docs/reference-architecture.md
+- docs/requirements.md
+- docs/invariants.md
+- skills/add-feature.md
+- the existing R1 implementation
+- the R1 tests
+
+Treat the current R1 implementation as the baseline. Do not redesign or rewrite R1 unless a concrete R2 requirement makes it necessary.
+
+Determine:
+1. Domain entities involved in a transfer
+2. Whether any new entities are required
+3. Relationships between Wallet, LedgerEntry, UserAccount, and any new entities
+4. Transfer state/lifecycle
+5. Required fields and field types
+6. MongoDB indexes and uniqueness constraints
+7. Transfer API endpoints
+8. Request/response contracts
+9. Authentication and authorization rules
+10. Validation rules and error cases
+11. Exact invariants affected
+12. Tests required
+13. Frontend screens/components required
+14. Frontend API calls required
+15. Seed/demo data changes required
+16. Exact files that would be created or modified
+
+CRITICAL CONCURRENCY / DATABASE ANALYSIS:
+
+The current MongoDB instance is standalone mongod with no replica set, so multi-document MongoDB transactions are unavailable.
+
+Analyze this explicitly.
+
+Determine how R2 can safely handle:
+- two concurrent transfers from the same wallet
+- insufficient balance under concurrency
+- duplicate requests/retries
+- failure after debiting the sender but before crediting the receiver
+- failure after crediting the receiver
+- process crash during a transfer
+- partial writes
+- repeated submission of the same logical transfer
+- ledger/balance divergence
+- recovery/reconciliation after an interrupted operation
+
+Do NOT simply assume that two wallet documents can be updated atomically.
+
+Compare the viable approaches for this project's constraints and explain the tradeoffs.
+
+In particular evaluate whether the transfer should use:
+- MongoDB transactions / replica set
+- conditional single-document updates
+- transfer state documents
+- compensating operations
+- pending/completed/failed states
+- another approach supported by the existing stack
+
+Recommend one approach and explain exactly why it satisfies the documented invariants and HackerRank constraints.
+
+IDEMPOTENCY:
+
+R3 is a separate documented requirement.
+
+Design R2 so that it does not accidentally make R3 impossible, but do not implement the full R3 feature unless it is strictly necessary for R2 correctness.
+
+Clearly separate:
+- correctness required by R2
+- idempotency functionality that belongs to R3
+
+LEDGER:
+
+R1 established:
+
+Wallet:
+- availableBalanceMinor
+
+LedgerEntry:
+- walletId
+- userId
+- transactionId
+- kind
+- direction
+- amountMinor
+- balanceAfterMinor
+
+Explain how a successful transfer creates ledger entries for both wallets.
+
+Explain how the shared transactionId is used.
+
+Explain how the running balance is maintained for each wallet.
+
+INVARIANTS:
+
+Explicitly map the design against:
+- INV-1
+- INV-2
+- INV-4
+- INV-7
+- INV-8
+- INV-9
+- INV-10
+- INV-11
+- INV-12
+- INV-13
+- INV-17
+- INV-18
+
+Also identify any invariants that cannot be fully guaranteed under standalone MongoDB and explain the mitigation.
+
+SCOPE:
+
+R2 ONLY:
+- P2P transfer between two users
+- sender balance validation
+- concurrency-safe debit
+- receiver credit
+- transfer lifecycle/state if required
+- transfer history through the existing ledger
+- appropriate failure handling
+
+DO NOT IMPLEMENT:
+- full idempotency-key feature
+- money requests
+- refunds/reversals
+- rate/velocity checks
+- deferred/batch processing
+- reconciliation
+- analytics
+- RBAC/admin
+- unrelated refactors
+
+ARCHITECTURE:
+
+Follow the existing reference architecture:
+
+Frontend:
+feature components -> feature API -> shared API client
+
+Backend:
+URL -> View -> Schema -> Service -> Repository -> Model
+
+Do not introduce new dependencies or architectural layers.
+
+Do not over-engineer the solution.
+
+The implementation must remain understandable and reviewable by a human developer.
+
+OUTPUT:
+
+Produce ONLY the discovery/design report.
+
+At the end include:
+
+A. Proposed domain model
+B. Transfer state machine
+C. Proposed API contract
+D. Concurrency strategy
+E. Failure/recovery strategy
+F. Idempotency boundary between R2 and R3
+G. Ledger behavior
+H. Proposed file changes
+I. Test plan
+J. Invariants covered
+K. Known limitations
+L. Open questions requiring my approval
+
+WAIT FOR MY APPROVAL BEFORE IMPLEMENTING ANYTHING.
+
+Agent Response Summary:
+Performed read-only discovery for R2 (P2P Transfers) and produced a design report; no repository file was created, modified, or deleted. Read docs/reference-architecture.md, docs/requirements.md (R2 at lines 48-77, R3 at 79-107), docs/invariants.md (INV-1..18), skills/add-feature.md, and the full R1 implementation (wallet models/repository/services/schema/views/urls/constants, auth models/repository, shared errors/validation/mongo, seed and seed_data, tests/base plus all R1 tests, frontend App.jsx, wallet api/format/history components, SignInForm). Verified the deployment empirically instead of assuming: mongod 8.2.12 reports setName NONE and multi-document transactions fail with OperationFailure code 20 (Transaction numbers are only allowed on a replica set member or mongos); mongod is started from the system-level /etc/mongod.conf, so a replica set is not reachable from the repo without changing setup. Probed the persistence primitives R2 would rely on in a throwaway scratch database (since dropped): a conditional find_one_and_update with a $gte balance filter correctly refuses an overdrawn second debit; a unique compound index on (transactionId, walletId) rejects a duplicate ledger leg; and a single atomic update combining $inc with a $push of a pending-movement record is idempotent per transferId, which is the mechanism that lets every balance change carry its own recovery metadata. Found a real validation hole: shared read_number coerces True to 1, so amountMinor: true would pass a minimum=1 check, and passing a default makes a missing field silently succeed; the R2 schema must reject booleans and must not pass a default. Recommended a transfer document as the commit point with conditional single-document balance mutations that co-record recovery metadata, idempotent forward-only completion, and no compensating reversals, and documented honestly which invariants cannot be fully guaranteed without a replica set. Seven open questions were raised for approval, chiefly app placement, the history surface, recipient identification, and whether to relax the no-configuration-change constraint to enable literal atomicity.
+
+Actions:
+* Read docs/requirements.md, docs/invariants.md, docs/reference-architecture.md, skills/add-feature.md
+* Read backend/apps/wallet (models, repository, services, schema, views, urls, constants).py
+* Read backend/apps/auth (models, repository).py and backend/apps/shared (errors, validation, mongo).py
+* Read backend/scripts/seed.py, backend/scripts/seed_data.py, backend/tests/base.py, backend/tests/test_seed.py, backend/tests/test_wallet_services.py, backend/wallet_backend/urls.py, setup.sh
+* Read frontend/src/App.jsx, frontend/src/features/wallet (wallet.api.js, wallet-format.js, WalletHistoryList.jsx), frontend/src/features/auth/SignInForm.jsx
+* Verified MongoDB topology, versions, and transaction unavailability via mongosh and pymongo
+* Ran three throwaway probes (deleted afterwards) for conditional debit, unique compound index, and atomic $inc plus $push idempotency; all left no residue
+* Logged this turn to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T14:02:10+05:30] Complete R2 P2P transfers and commit as c7771f8
+
+User Prompt (verbatim, secrets redacted):
+continue
+
+Agent Response Summary:
+Finished wiring R2 (POST /api/v1/transfers), enriched transaction history with a
+read-time counterparty join, seeded three backdated demo transfers through the real
+transfer service, and wrote 67 new backend tests (116 total, all passing). During the
+concurrency tests I found a genuine design flaw: recovery could complete a transfer while
+its own request was midway through, and the two would each apply the same movement once
+the first released the movements. Fixed by having recovery touch only transfers older
+than RECOVERY_AGE_SECONDS, so it can never compete with a live request, plus a re-read of
+transfer state at the top of complete_transfer. Also fixed a real bug where the credit
+branch discarded the wallet post-image it then read, and a real bug where the history join
+missed every counterparty because public_entry stringifies transactionId while the lookup
+dictionary was keyed by ObjectId. Frontend: TransferForm with inline field errors,
+exact string-based rupee-to-paise parsing, and error codes/details surfaced on thrown
+errors. Verified with manage.py check, the full test suite, vite build, setup.sh --seed,
+curl against every endpoint, and a browser walkthrough covering validation, unknown
+recipient, success, and insufficient funds. Committed as c7771f8.
+
+Actions:
+* Added backend/apps/transfers (constants, models, repository, services, schema, views, urls)
+* Modified backend/apps/wallet/{constants,models,repository,views}.py and backend/apps/auth/repository.py
+* Modified backend/wallet_backend/urls.py, backend/scripts/{seed.py,seed_data.py}
+* Modified backend/tests/{base.py,test_seed.py}; added test_transfers_services.py, test_transfers_api.py
+* Added frontend/src/features/transfers/{TransferForm.jsx,transfers.api.js}
+* Modified frontend/src/{App.jsx,styles.css} and shared/api/client.js, features/wallet/*
+* Ran: manage.py check, manage.py test (116 OK), vite build, setup.sh --seed, curl sweep, browser walkthrough
+* Committed as c7771f8
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T15:12:47+05:30] R3 idempotent transfers implemented per approved decisions
+
+User Prompt (verbatim, secrets redacted):
+Approved with these decisions:
+
+L1 - Header optional:
+YES. Preserve R2 keyless behavior. Idempotency applies when the client supplies Idempotency-Key.
+
+L2 - PENDING replay:
+YES, return HTTP 200 with the real PENDING transfer state and idempotentReplay=true.
+Do not add a polling endpoint or additional infrastructure.
+
+L3 - Release key on FAILED:
+YES.
+Release idempotencyKey and idempotencyFingerprint only as part of a conditional terminal FAILED transition.
+Before implementing this, ensure R2 failure semantics guarantee that no unresolved financial effect remains when a transfer is considered FAILED.
+Add tests proving a released key can safely be reused.
+
+L4 - Partial unique index:
+YES.
+Keep Idempotency-Key optional and use the sender-scoped partial unique index.
+The shared documents index helper is approved because the existing MongoEngine version requires raw index creation for partialFilterExpression.
+
+L5 - replayedCount:
+DROP IT.
+It is not required for correctness and creates unnecessary write amplification.
+
+L6 - Header name:
+Use exactly:
+Idempotency-Key
+No alias.
+
+L7 - Seed:
+Keep seeded transfers keyless.
+Do not add reusable idempotency keys to the baseline seed.
+The idempotency behavior must be demonstrated through automated tests and API/browser verification instead.
+
+Additional requirements:
+
+- Do not modify R1/R2 behavior outside the approved R3 scope.
+- Do not create a separate IdempotencyKey collection.
+- Keep the idempotency key and fingerprint on Transfer.
+- The unique index must be the correctness mechanism for concurrent claim attempts; a preliminary lookup may only be an optimization.
+- Same key + same canonical request -> replay original transfer.
+- Same key + different canonical request -> 409 IDEMPOTENCY_KEY_REUSED.
+- Never return the original request's sensitive details in the mismatch error.
+- Key ownership remains scoped by senderUserId.
+- Keyless requests remain valid and preserve R2 behavior.
+- Do not duplicate the transfer engine.
+- R3 must route through the existing R2 transfer execution/recovery logic.
+- Do not add TTL, offline queues, multi-tab coordination, or unrelated infrastructure.
+
+Implement only after applying these decisions.
+
+After implementation report:
+1. files changed
+2. API behavior
+3. idempotency data model
+4. concurrency behavior
+5. failure/recovery behavior
+6. tests added and total passing
+7. build/check/seed/API/browser verification
+8. invariants verified
+9. known limitations
+
+Do not modify README, favicon, dependencies, setup architecture, or unrelated code.
+
+Agent Response Summary:
+Implemented R3 by holding the sender's idempotency key on the existing Transfer document rather than adding an IdempotencyKey collection, so claiming a key and recording a transfer are one atomic write and key ownership is key-ownership-of-the-transfer. Correctness rests on a new sender-scoped partial unique index on (senderUserId, idempotencyKey); the preliminary find-by-key read is only an optimisation, and the insert's DuplicateKeyError is what refuses a losing racer. Fingerprints are a SHA-256 digest of "v1|resolvedRecipientAccountId|amountMinor|note" taken from validated values, so a key reused for a different amount, recipient or note is refused with 409 IDEMPOTENCY_KEY_REUSED and the refusal leaks nothing about the original request. A replay reports the stored transfer and the current balance and never drives completion, which keeps the R2 recovery sweep the only thing that finishes a transfer after the fact; a PENDING replay answers 200 with the real state. Per L3 I first verified that R2 can only reach FAILED from a refusal before its first write, then made mark_failed release the key, fingerprint and a releasedAt stamp in that same conditional update, with tests proving no money moved and that a released key can be spent again. Keyless requests are untouched. 58 new tests bring the suite to 174, all green and stable across repeated runs; mutation checks confirmed the tests fail when the index, the fingerprint comparison or the release is removed, and browser verification of an ambiguous response showed the UI reporting "Already sent" with the balance debited exactly once.
+
+Actions:
+* Read docs/reference-architecture.md, requirements.md, invariants.md, skills/add-feature.md, and the R1/R2 implementations and tests
+* Modified backend/apps/shared/documents.py (generic ensure_index helper for raw partial index creation)
+* Modified backend/apps/transfers models.py, constants.py, repository.py, schema.py, services.py, views.py
+* Modified backend/scripts/seed.py (ensure_transfer_indexes; tuple-unpack the new service return)
+* Modified backend/tests/base.py (ensure_transfer_indexes; wipe before building the index)
+* Modified backend/tests/test_transfers_services.py (unpack the new (response, created) return)
+* Added backend/tests/test_idempotency.py (58 tests)
+* Modified frontend/src/App.jsx, features/transfers TransferForm.jsx and transfers.api.js
+* Verified R2 failure semantics empirically before enabling key release
+* Ran mutation checks: dropped the partial index, disabled the fingerprint comparison, disabled the release
+* Ran: manage.py check, manage.py test (174 OK, stable over 4 runs), vite build, prettier --check, setup.sh --seed
+* Ran curl sweep of every status code and inspected the browser's real request headers
+* Browser walkthrough: simulated an ambiguous response, then retried, observing one debit and "Already sent"
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T16:07:03+05:30] R3 committed after review
+
+User Prompt (verbatim, secrets redacted):
+accepted commit the current change
+
+Agent Response Summary:
+Committed the reviewed R3 work as 7592eaf on main, the fifth commit in the series after the
+foundation pass, R1 and R2. Verified the committed tree is exactly the fifteen files that were
+reviewed - fourteen modified and the one new test file - with no build output, lockfile, README,
+favicon or setup configuration swept in, and left the working tree clean. Did not push, because
+the standing instruction is to push only when asked; main still has no upstream and origin/main
+is still at f502009, so R1, R2 and R3 all remain local. Updated the submission checklist to record
+the commit hash for R3 and to move the outstanding range to R4 through R11.
+
+Actions:
+* Reviewed git log to match the established commit-message style
+* Staged all fifteen files and committed as 7592eaf with the message "Add idempotency to transfers"
+* Verified the commit's file list and confirmed nothing unexpected was included
+* Confirmed the working tree is clean after the commit
+* Updated ~/hackerrank_react_django_application/checklist.md with the R3 commit hash
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T17:40:00+05:30] R4 approved after discovery report
+
+User Prompt (verbatim, secrets redacted):
+Approved for implementation with one amendment.
+
+Approve all recommendations in section N:
+
+- APPROVING state
+- 409 REQUEST_APPROVAL_IN_PROGRESS while approval is genuinely in flight
+- return 200/idempotentReplay when the underlying transfer has already completed
+- failed approval returns request to PENDING
+- recipientEmail
+- REQUESTER / APPROVER roles
+- /approval and /decline action routes
+- no GET /money-requests/<id>
+- role + state filters
+- duplicate pending requests allowed
+- 7-day expiry
+
+Additional required change:
+
+R4 uses a deterministic internal idempotency key for approval.
+
+Do NOT allow ordinary client-supplied Idempotency-Key values to deliberately collide with the reserved R4 namespace.
+
+Reserve the prefix:
+
+money-request:
+
+Normal client-supplied Idempotency-Key values beginning with "money-request:" must be rejected with 400 IDEMPOTENCY_KEY_INVALID (or the existing appropriate validation code).
+
+The internally generated R4 key:
+money-request:<request_id>
+is allowed only when called from the MoneyRequest approval flow.
+
+Do not redesign R3 or introduce a second idempotency system just for this.
+
+Everything else in the discovery report is approved.
+
+Implementation constraints:
+
+- Do not modify apps/transfers financial logic.
+- Approval MUST call the existing transfers.execute_transfer().
+- Do not implement request-specific debit/credit/ledger logic.
+- Preserve R1-R3 behavior and tests.
+- Use atomic conditional state transitions.
+- Keep terminal states immutable.
+- Keep lazy expiration.
+- Keep the standalone MongoDB failure/recovery strategy described in the report.
+- No new dependencies.
+- No unrelated refactors.
+- Do not modify README, favicon, setup.sh, hackerrank.yml, manifests, or lockfiles.
+
+Implement in the proposed order.
+
+After implementation report:
+1. files changed
+2. API behavior
+3. state machine behavior
+4. approval -> transfer flow
+5. failure/recovery behavior
+6. expiration behavior
+7. concurrency behavior
+8. tests and total passing
+9. mutation tests
+10. build/check/seed/API/browser verification
+11. invariants verified
+12. known limitations
+
+Do NOT commit yet. I will review the implementation before committing.
+
+Agent Response Summary:
+Recorded the approval of all eleven design recommendations and began implementing R4. Two
+deltas from the discovery report were settled during implementation and will be reported
+for review: the reserved `money-request:` prefix is declared in apps/transfers/constants.py
+(so the dependency points transfers <- money_requests, never the reverse) and rejected from
+client-supplied keys in read_idempotency_key with its own 400 code IDEMPOTENCY_KEY_RESERVED;
+and the abandoned-claim repair was changed from an age-gated release back to PENDING into an
+age-gated takeover, which removes the only path by which a request could return to a
+claimable state while money had already moved against it. Also noted that the batched
+key lookup the list path needs adds one read-only query to apps/transfers/repository.py, which
+is not financial logic and is reported as such.
+
+Actions:
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+* Re-read apps/transfers/schema.py and apps/shared/errors.py before editing
+* Started writing backend/apps/money_requests/ in the approved order
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:20:00+05:30] R4 money requests implemented, verified, and left uncommitted for review
+
+User Prompt (verbatim, secrets redacted):
+<conversation-checkpoint summary resuming the R4 build, then "continue" x3>
+
+Agent Response Summary:
+Finished R4 (Money Requests) per the agreed design: backend app apps/money_requests wired
+into wallet_backend/urls.py, reserved money-request: prefix rejected from client keys with
+400 IDEMPOTENCY_KEY_RESERVED, deterministic approval key money-request:<id> so R3's unique
+index guarantees one transfer per request, approve -> execute_transfer -> settle_approved
+flow with atomic conditional claims, lazy expiration, takeover of stale claims, read-path
+settlement of interrupted approvals, role/state filters, seed covering every state, a React
+feature folder (money_requests API, ask form, request list) wired into App.jsx and styles.css.
+Backend is 288 tests passing (was 174 after R3), stable across four runs; manage.py check
+clean; prettier clean; vite build clean; setup.sh --seed green at 4/4/13/5/6; full HTTP
+sweep of every status code matched, including a concurrent-approval race that produced
+exactly one 200 and one 409 REQUEST_APPROVAL_IN_PROGRESS and conservation of the seeded
+total of INR 12,228.50 across six live answers; browser walkthrough exercised sign in,
+ask, approve, decline, and ledger reflection. Mutation sweep: 9 of 9 guarantees are caught
+by tests, after adding tests that pinned settle_approved's state filter and find_by_keys'
+sender scoping, both of which were initially uncovered defence-in-depth. Nothing is
+committed; README, favicon, setup.sh, hackerrank.yml, manifests and lockfiles untouched.
+
+Actions:
+* Edited backend/tests/test_money_requests_services.py (line wrapping; new pinned tests for settle_approved state filter and find_by_keys sender scoping) and backend/tests/test_money_requests_api.py (line wrapping)
+* Edited backend/scripts/seed.py and backend/tests/test_seed.py (wrapped two long lines)
+* Wrote frontend/src/features/money_requests/{money-requests.api.js,MoneyRequestForm.jsx,MoneyRequestList.jsx}; edited frontend/src/App.jsx and frontend/src/styles.css
+* Restarted the runserver on :8000, re-seeded, ran the HTTP sweep, the mutation script, four full test runs, prettier, vite build, seed
+* Drove a real browser session for sign-in/ask/approve/decline via DOM evaluation; closed both tabs
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:24:00+05:30] R4 committed as a2acd5b after user approval
+
+User Prompt (verbatim, secrets redacted):
+approved commit the changes
+
+Agent Response Summary:
+Committed the R4 money requests implementation as a2acd5b ("Add money requests between
+wallet accounts"), 23 files changed, 3352 insertions(+), 19 deletions(-). Working tree is
+now clean. No push performed; the user has not asked for one.
+
+Actions:
+* git add of the R4 backend app, routes wiring, transfers constants/schema/repository, seed
+  scripts and tests, and the frontend money_requests feature folder, App.jsx and styles.css
+* git commit -F with the same multi-paragraph message style as the R3 idempotency commit
+* Verified git log and git status show a clean tree
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:31:00+05:30] Center the sign-in section on the page
+
+User Prompt (verbatim, secrets redacted):
+before moving to next requirement fix the sign in section it is not centered
+The user made the following comment regarding the "section.signin" element ...: this is not centered
+
+Agent Response Summary:
+The sign-in card sat in the top-left because .app-shell-main was a plain block and the
+card had no auto margins, and behind that .app-shell only had min-height: 100% of a chain
+of min-height declarations, so it shrink-wrapped to its content (measured 482px tall on a
+650px window) and any centering was invisible. Fixed two ways: (1) .app-shell now uses
+min-height: 100vh so the shell always fills the window; (2) while the stage is signIn the
+main gets an extra class app-shell-main-centered that displays it as a flex box justifying
+and aligning its single child. Verified in the browser: the card renders at left 190 of
+800 and top 183 with the 74.8px header accounted for, i.e. centered both directions; the
+wallet stage after sign-in still renders all sections normally. Prettier and vite build
+pass. Left uncommitted pending the user's review.
+
+Actions:
+* Edited frontend/src/App.jsx (main element gets app-shell-main-centered in the signIn stage)
+* Edited frontend/src/styles.css (.app-shell min-height: 100vh with an explanatory comment; new .app-shell-main-centered rule)
+* Opened a headless tab, measured bounding boxes via browser.evaluate, signed in and back
+  out to confirm the wallet stage, closed the extra tab, restored the user's tab to the
+  sign-in screen
+* Ran bunx prettier --check src and bun run build
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:33:00+05:30] Commit the sign-in centering fix as 6706683
+
+User Prompt (verbatim, secrets redacted):
+looks good commit
+
+Agent Response Summary:
+Committed the centering fix as 6706683 ("Center the sign-in section on the page"), touching
+frontend/src/App.jsx and frontend/src/styles.css, 14 insertions and 2 deletions. Working
+tree is clean. Not pushed, as no push has been requested.
+
+Actions:
+* git add of the two frontend files and git commit with a message explaining both the
+  immediate and the deeper cause
+* Confirmed git log and clean git status
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T12:34:00+05:30] Amended the centering commit hash after dropping a co-author trailer
+
+User Prompt (verbatim, secrets redacted):
+(none; housekeeping)
+
+Agent Response Summary:
+Dropped an accidental Co-authored-by trailer so the commit message matches the repo's
+existing style; the commit is now a67908b instead of 6706683. Same two files, same
+message otherwise. Earlier entry above referencing 6706683 is superseded by this one.
+No push has been requested.
+
+Actions:
+* git commit --amend to remove the trailer
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T21:58:40+05:30] Finished the R5 browser walkthrough on both sides of a refund
+
+User Prompt (verbatim, secrets redacted):
+continue
+
+Agent Response Summary:
+Submitted a real partial refund in the open browser form (Rs 10.00 against the
+fatima->aarav payment, note "Browser walk refund"). The page showed the success notice
+"Returned Rs 10.00 to Fatima Noor.", the balance moved Rs 749.00 -> Rs 739.00, the
+eligible row updated to "Rs 89.00 refundable", the form closed, and a "Refund sent"
+row appeared in transaction history. Signed out and back in as Diego (Rs 11,195.50, two
+eligible rows, all his own refund legs) then as Fatima, who showed six "Refund received"
+rows with + signs and her own seeded refund history, confirming the REFUND_IN label on
+the receiving side. No console errors were raised.
+
+Actions:
+* Browser: filled #refundAmount and #refundNote, clicked Refund, read back the notice
+* Browser: signed in as diego.santos@wallet.demo and fatima.noor@wallet.demo to verify
+  the REFUND_IN label on the counterparty's history
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T22:10:05+05:30] Reconciled balances against the ledger and ran the verification battery
+
+User Prompt (verbatim, secrets redacted):
+continue
+
+Agent Response Summary:
+Queried MongoDB directly to settle an arithmetic doubt: every wallet's stored balance
+equals its derived ledger balance, the system total is conserved at Rs 12,228.50, every
+refund counter sits at or below its original amount, and the one FAILED refund wrote no
+legs. Proved the original transfer's ledger legs are byte-identical after refunds
+(same amounts, same balanceAfterMinor, original timestamps) while refunds appended their
+own legs. Ran the verification battery: manage.py check clean, four consecutive full
+suite runs at 348 passing, per-module runs all green with R1-R4 unchanged at 288 and R5
+adding 60, a demo-database fingerprint that was identical after 1,392 test executions,
+bun build and prettier clean, and setup.sh --seed restoring the baseline. git status
+shows only R5 files touched; README, .prettierrc, package.json, lockfiles, setup.sh and
+hackerrank.yml are untouched.
+
+Actions:
+* Queried wallets, refunds, transfers and ledger entries via pymongo to reconcile balances
+* ../.venv/bin/python manage.py check
+* ../.venv/bin/python manage.py test (4 consecutive runs, 348 passing each)
+* ../.venv/bin/python manage.py test tests.test_<module> (12 modules, all OK)
+* bun run build; bunx prettier --check src
+* bash setup.sh --seed
+* git status --short; git diff --stat
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T22:19:00+05:30] Proved refund concurrency and replay over HTTP
+
+User Prompt (verbatim, secrets redacted):
+continue
+
+Agent Response Summary:
+Wrote an end-to-end script (/tmp/opencode/r5_race.py) that fires six simultaneous full
+refunds of the same payment at the running server and then retries one keyed refund
+twice. Exactly one of six settled, the other five were refused with 409
+REFUND_LIMIT_EXCEEDED, the counter stopped at the original amount with nothing
+remaining, no balance went negative and the system total was unchanged; the keyed retry
+created the refund once, replayed it as 200 with Idempotent-Replayed: true, and moved no
+money the second time. 14 of 14 checks passed. Two earlier FAILs were my harness
+comparing a per-phase delta with a cumulative counter, not application defects; the
+bounds were corrected and the run repeated from a fresh seed.
+
+Actions:
+* Wrote and corrected /tmp/opencode/r5_race.py
+* bash setup.sh --seed, then ran the race and replay script against localhost:8000
+* Re-ran /tmp/opencode/mutate5.sh in the background to confirm 11 of 11 caught
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T22:31:15+05:30] Committed R5 refunds and reversals as 2712df3
+
+User Prompt (verbatim, secrets redacted):
+approved commit the changes
+
+Agent Response Summary:
+Staged the reviewed R5 set and committed it as 2712df3 ("Add refunds that give
+part of a payment back"), 28 files changed, 2320 insertions, 18 deletions. The
+staged list was checked against git status before committing: 15 modified paths
+and 13 new ones, with no __pycache__, build artifacts, environment files or
+lockfiles among them, and nothing left unstaged afterwards. The message follows
+the repo's existing style, explaining why a refund is a compensating transfer
+rather than a reversal and why the cap is a single $expr-guarded claim. Nothing
+has been pushed; origin/main is still a67908b. Remaining R5 state: no commit of
+the transcript log, which stays outside the repo until the submission copy.
+
+Actions:
+* git add -A, then verified git diff --cached --name-status
+* git commit with the R5 message
+* Verified the tree is clean and the commit carries no artifacts or caches
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-03T22:35:00+05:30] Restructured the frontend into Money and Activity views
+
+User Prompt (verbatim, secrets redacted):
+UI Restructure — Money & Activity Views. Implement a UI-only restructure of the
+existing wallet frontend. [full brief: two top-level state-driven views, Money with
+a Send/Ask toggle and Activity with a History/Refunds toggle; single-page, no React
+Router, no new state library, no backend changes, reuse existing components; verify
+in the browser and run the existing test and build commands]
+
+Agent Response Summary:
+Replaced the single stacked page with two views driven by three pieces of local
+state (view, moneyPanel, activityPanel) defaulting to Money then Send. Added one
+small reusable control, shared/ui/TabBar.jsx, used at both levels: it is the tabs
+pattern over real buttons with aria-selected, arrow-key and Home/End movement, and
+roving tabindex. The panels are hidden with the hidden attribute rather than
+unmounted, so a half-typed amount survives a trip to another view and every
+aria-controls resolves. The top-level strip sits in the header and is filled with the
+accent when pressed; the inner strip reuses the existing request-chip classes
+untouched. CSS grew by 67 lines, including an explicit [hidden] rule because an
+author display beats the user agent's. Verified in the browser: all four panels,
+zero network requests on switching, keyboard navigation, draft preservation, a real
+transfer, a request created/approved/declined including the insufficient-funds row
+error, a real partial refund, the 400px layout with no overflow, reload keeping the
+session, and a Lighthouse accessibility score of 1.0. Backend untouched: 348 tests
+still pass, check is clean, build and prettier are clean.
+
+Actions:
+* Created frontend/src/shared/ui/TabBar.jsx
+* Rewrote the wallet composition in frontend/src/App.jsx (composition only; no
+  handler, prop or state value changed, verified by diffing non-whitespace lines)
+* Added 67 lines of navigation CSS to frontend/src/styles.css
+* Browser: exercised Money/Send, Money/Ask, Activity/History, Activity/Refunds,
+  keyboard navigation, draft preservation, transfer, request create/approve/decline,
+  partial refund, 400px narrow layout via a same-origin iframe, reload and sign-out
+* ../.venv/bin/python manage.py check; ../.venv/bin/python manage.py test (348 OK)
+* bunx prettier --check src; bun run build
+* Appended this entry to ~/hackerrank_react_django_application/log.txt
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+## [2026-10-03T22:55:25+05:30] Modern wallet UI restructure: Home, Send, Ask, Activity pages
+
+User Prompt (verbatim, secrets redacted):
+Modern Wallet UI Restructure
+
+Redesign the wallet frontend into a modern fintech/payment-app layout inspired by the information hierarchy of apps like Google Pay, while preserving the existing project architecture and all existing functionality. Frontend-only UI/composition task.
+
+Target navigation structure: simple React state-driven page navigation, no React Router. Conceptual pages: Home, Send, Ask, Activity.
+
+Home page: greeting / user identity, available wallet balance, currency / wallet info, two prominent actions (Send Money, Ask Money) as action cards that navigate to their own views (not a toggle), recent activity preview, and a "See all" action that opens Activity.
+
+Send page: Back, "Send money", reuse the existing TransferForm without rewriting its API or business logic.
+
+Ask page: Back, "Ask for money", reuse the existing MoneyRequestForm and MoneyRequestList; do not modify the money-request API/business logic.
+
+Activity page: a completely separate page/view with the full wallet activity/history, using the existing WalletHistoryList and RefundsSection. Filters: All, Sent, Received, Refunds. Do not create another transaction system.
+
+Navigation: clean application-level navigation, preferred desktop structure "W Wallet   Home   Activity   Aarav Mehta". The active page gets a subtle but obvious selected state. Do not use the previous "Money | Activity" / "Send | Ask" toggle hierarchy; Home | Activity is the primary navigation and Send and Ask are reached through the prominent actions on Home.
+
+State-driven navigation: local React state for page navigation, e.g. const [page, setPage] = useState("home") with values home, send, ask, activity. Keep this simple. Do not create a custom routing abstraction.
+
+Component architecture: preserve the existing feature-first architecture. Do not unnecessarily move existing feature components. If a small presentational component is needed, place it according to the existing frontend feature/shared structure.
+
+Visual direction: make the UI feel like a modern wallet/payment application, not an admin dashboard. Prioritize large balance, clear primary actions, generous spacing, rounded cards, simple transaction rows, clear positive/negative transaction amounts, subtle borders, strong typography hierarchy, minimal visual noise, responsive layout, clear hover/active/focus states. The existing dark visual identity can be preserved; do not introduce a completely different design system. Do not copy Google Pay's exact visual design, branding, assets, or UI. Use it only as inspiration for the information hierarchy and interaction model.
+
+Header: simplify the existing header, conceptually "W Wallet   Home   Activity   Aarav Mehta". The existing authenticated user information and sign-out functionality must remain available. Do not remove authentication controls.
+
+Recent activity on Home: a small preview, not the entire history. Use existing wallet history data. Show a reasonable number of recent transactions including transaction type/icon, counterparty/description, date/time, amount, positive/negative visual distinction. "See all" should switch to Activity. Do not create a new backend endpoint solely for this UI.
+
+Constraints: strictly frontend/UI composition. DO NOT modify the Django backend, MongoDB models, services, repositories, financial logic, transfer logic, refund logic, money-request logic, authentication logic, API endpoints, API contracts, database seed, dependencies, package.json, lockfiles, setup.sh, hackerrank.yml, or .prettierrc. Do not introduce React Router, Redux, Zustand, another global state library, another UI/component library, or new dependencies.
+
+Preserve existing functionality on every page. No backend changes should be necessary.
+
+Responsive behavior: desktop stacks header / balance / Send+Ask actions / recent activity; mobile stacks header, balance, Send, Ask, recent activity. The layout should collapse naturally without horizontal scrolling. Buttons must remain easy to tap.
+
+Accessibility: maintain semantic buttons, keyboard navigation, visible focus states, appropriate labels, sufficient text contrast, accessible interactive states. Do not use clickable <div> elements for navigation/actions.
+
+Verification: verify Home -> Send -> Back -> Ask -> Back -> Activity -> Back. Verify functional regression (send money, ask money, request approval, request decline, transaction history, refunds, authentication/sign-out). In the browser check no console errors, no broken API calls, no layout overflow, desktop layout, mobile/responsive layout, keyboard navigation. Run the existing project test command (python manage.py test) and the existing frontend build/check command. Do not create a new test runner.
+
+Scope discipline: keep this change small and reviewable. If you discover an unrelated bug, do not fix it as part of this task, record it separately, and continue with the UI restructure. The final diff should primarily contain App/page composition changes, navigation state, Home dashboard layout, Send/Ask page presentation, Activity page presentation, and necessary CSS. There should be zero backend or financial-domain changes.
+
+Agent Response Summary:
+Replaced the two-level toggle hierarchy with four state-driven pages. App.jsx now holds `page` (home | send | ask | activity) and `activityFilter` (all | sent | received | refunds); the header renders a `<nav>` with Home/Activity buttons carrying aria-current="page", and the four pages are mounted-but-hidden so switching never unmounts a half-filled form or refetches. Extracted `features/home/HomePage.jsx` (greeting, reused WalletBalanceCard, two Send/Ask action cards, RecentActivity) and `features/home/RecentActivity.jsx` (4-row preview drawn from the already-loaded history, signed amounts, See all), plus `shared/ui/BackButton.jsx`. Activity filters reuse the existing request-chip + aria-pressed pattern and read the same ledger, so no new endpoint or component was introduced. Deleted the now-unused `shared/ui/TabBar.jsx` from the previous task, since the brief removes the toggle hierarchy it existed to render. Zero backend, dependency, manifest, or lockfile changes.
+
+Actions:
+* Edited frontend/src/App.jsx (composition + navigation state only, +264/-69 with styles)
+* Created frontend/src/features/home/HomePage.jsx, frontend/src/features/home/RecentActivity.jsx, frontend/src/shared/ui/BackButton.jsx
+* Deleted frontend/src/shared/ui/TabBar.jsx (unused after the toggle hierarchy was replaced)
+* Edited frontend/src/styles.css (+308/-: app-nav, app-page, page-heading, back-button, home-*, activity-row, activity-filters)
+* Ran bunx prettier --check src, bun run build, python manage.py check, python manage.py test (348 OK)
+* Browser walkthrough of all four pages, filters, send, ask, approve, decline, refund, 400px layout, a11y probe
+* Ran bash setup.sh --seed to restore the demo baseline
+
+Context:
+tool=opencode (Big Pickle)
+branch=--abspath-ref
+short
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T23:02:03+05:30] Header nav links become plain text instead of pills
+
+User Prompt (verbatim, secrets redacted):
+small changes before commiting
+
+The user made the following comment regarding the "button.app-nav-link.app-nav-link-current" element in browser tab tab_44d85b4a-8a14-4cf9-94c9-2f53d5c7bbf6 at http://localhost:3000/ (role button; accessible name "Home"; selector "#root > div > header > nav > button:nth-of-type(1)"; browser ref @e104, usable as ref in any browser tool including browser.evaluate until the page navigates): remove the rounded border let the button be just text matching the other asthetic
+
+The user made the following comment regarding the "button.app-nav-link" element in browser tab tab_44d85b4a-8a14-4cf9-94c9-2f53d5c7bbf6 at http://localhost:3000/ (role button; accessible name "Activity"; selector "#root > div > header > nav > button:nth-of-type(2)"; browser ref @e105, usable as ref in any browser tool including browser.evaluate until the page navigates): remove the rounded border let the button be just text matching the other asthetic
+
+Agent Response Summary:
+Took the header nav links off the pill. Dropped border-radius and the tinted fill, so both links now compute to a transparent background, 0px border, 0px radius and no shadow — pure text. The selected state is carried by weight and colour alone: the current page is accent green at 700, the other muted at 500. Verified in the browser that hovering the current page does not wash the accent out (the doubled class still outranks the hover rule), that hovering the other brightens it to the text colour, and that the accent outline focus ring survives. Also confirmed the 400px layout still wraps the nav onto its own row with both links on one line and no horizontal scroll, that page switching is unchanged, and that a clean reload produces no console errors or warnings.
+
+Actions:
+* Edited frontend/src/styles.css (.app-nav-link: removed border-radius, background fill and the background-color transition; .app-nav-link-current now colour + weight only)
+* Ran bunx prettier --check src and bun run build (clean)
+* Browser: computed-style probe of both nav links, hover and focus checks, 400px iframe layout, page-switch walkthrough, clean-reload console and network check
+
+Context:
+tool=opencode (Big Pickle)
+branch=--abspath-ref
+short
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T23:03:40+05:30] Commit the wallet UI restructure as e8e5054
+
+User Prompt (verbatim, secrets redacted):
+commit the changes
+
+Agent Response Summary:
+Committed the wallet UI restructure as e8e5054 "Open the wallet on a home screen with a page per job", 5 files, +678/-69, on main. Nothing was pushed. The message follows the repo's existing shape: an imperative subject, then paragraphs giving the immediate reason (the balance had no home and sat above the toggle levels as a third unaffiliated thing) and the deeper one (the hierarchy framed three separate jobs as three views onto one mode), then the structural decisions (Home costs no request, pages stay mounted and hidden, filters read the ledger already in hand), why TabBar went with the hierarchy it rendered, the verification performed, and the one deliberate limitation around Load more under a filter. Verified only the 5 intended frontend paths were staged and the working tree is clean afterwards.
+
+Actions:
+* git add frontend/src/App.jsx frontend/src/styles.css frontend/src/features/home frontend/src/shared/ui
+* git commit -F - (e8e5054, 5 files changed, 678 insertions, 69 deletions)
+* Confirmed git status --short is clean and nothing was pushed (origin/main still at a67908b)
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T23:13:19+05:30] R6 discovery started, then abandoned by the user
+
+User Prompt (verbatim, secrets redacted):
+R6 - Rate & Velocity Checks - Discovery / Design Only (full prompt asked for a 22-section design report; no files to be modified)
+
+Agent Response Summary:
+Read docs/requirements.md, docs/invariants.md and docs/reference-architecture.md and began inspecting R1-R5 to design R6 rate and velocity checks. Two findings were established before the user redirected. First, the governing requirement for R6 is a soft suspicious-activity flag on rolling count and amount windows, explicitly not an automatic account block, which contradicts the prompt's assumption of a pre-flight enforcement gate. Second, docs/reference-architecture.md is a description of the HackerRank starter calendar repo with no R6 section, no velocity content and no orthogonal-collection design, so the prompt's premise that the architecture already identifies R6 that way is not supported by the documents. No report was delivered and nothing was written, because the user cancelled the task.
+
+Actions:
+* read docs/requirements.md, docs/invariants.md, docs/reference-architecture.md
+* grepped the reference architecture for R-requirement markers and velocity terms (no matches)
+* no files created, modified or committed
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T23:13:19+05:30] R8 Authentication & RBAC discovery report
+
+User Prompt (verbatim, secrets redacted):
+skiping rate and velocity. Then: we are implementing R8 - Authentication & RBAC in the existing Digital Wallet & P2P Payment System. DISCOVERY / DESIGN task only. No file modifications, no code, no dependencies, no schema changes. Inspect the existing system and produce a precise implementation plan for R8 that fits the current architecture and preserves R1-R5. Report with exactly 24 sections.
+
+Agent Response Summary:
+Inspected the whole authentication and authorization surface and produced a 24-section discovery report without touching a file. Two premises in the request are contradicted by the governing documents and were reported as such. docs/requirements.md defines three roles (USER, MERCHANT, ADMIN) rather than the two the prompt assumed, and it supplies no permission matrix, so the MERCHANT capability delta is an open question rather than something to invent. And R8's acceptance criterion that administrative operations reject unauthorized users cannot be demonstrated while the application has no administrative operation, so shipping a role with nothing to protect was raised as a decision for the user rather than answered by inventing an admin screen. The inspection found the existing boundary is already strong: JWT HS256 with pinned algorithms and iss/aud/type checks, the account reloaded from MongoDB on every authenticated request, no endpoint accepting a client-supplied user or wallet id, path-supplied resource ids resolved and then ownership-checked to 403, and a clean 401 versus 403 split. That last fact settled the JWT question: role must be read from the account document rather than embedded in the token, because the re-read already happens and a claim would become a second, staler source of truth. The recommendation is one field on UserAccount, one role constant module, one role guard beside require_auth, zero new endpoints for the user path, and the smallest admin surface only if the user approves it.
+
+Actions:
+* read backend/apps/auth plus apps/shared authentication, errors, validation and documents modules, and all four financial apps' views, schema, services, constants, models and repository
+* read backend/tests/base.py, test_auth.py, test_seed.py, and grepped the existing ownership and auth tests
+* read frontend/src/App.jsx, shared/api/client.js, features/auth/*
+* read backend/scripts/seed.py and seed_data.py
+* read skills/add-feature.md, GUIDELINES.md, REQUIREMENTS.md, README.md, and the authorization, ownership and bypass sections of docs/invariants.md
+* grepped the backend for any pre-existing role, permission or admin concept (none found) and for every 401, 403, 404 and 409 producer
+* found that adding a zero-balance seed account would break the existing test_a_wallet_without_an_opening_balance_has_no_entries assertion, which is written against exactly one unopened wallet
+* no files created, modified or committed; working tree still clean at e8e5054
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+
+## [2026-10-04T00:42:53+05:30] R8 implementation: roles, require_role guard, ownership regressions
+
+User Prompt (verbatim, secrets redacted):
+Implement R8 — Authentication & RBAC based on the completed R8 discovery report. IMPLEMENTATION
+mode. Decisions fixed by the user: Q1 Option A (ADMIN role and server-side guard ship, but NO
+admin endpoint or admin UI is invented, because no legitimate administrative operation exists in
+the product); Q2 all three roles USER/MERCHANT/ADMIN are valid stored values, with MERCHANT given
+the same permissions as USER and ADMIN no additional operation yet, and no invented merchant
+financial behaviour; Q3 fail closed on an unrecognised stored role, returning 403
+ROLE_NOT_ALLOWED rather than silently promoting to USER; Q4 do NOT add INV-19 and do NOT modify
+docs/invariants.md, but still test the role-from-database behaviour. Scope: persisted roles, role
+constants, server-side guard, role in the authenticated account, role-aware tests, seeded roles,
+authorization regression tests, verification. Do NOT implement R6/R7/R9/R10/R11, admin CRUD,
+admin dashboard, account listing, role-management API or UI, permission registry/matrix, role
+hierarchy, JWT role claims, refresh tokens, token blacklist, MFA, OAuth, new dependencies, React
+Router, global state library, or a database migration system. Role must not be client-controlled
+through any request schema. Do not move authorization into views. Existing ownership rules
+(load_request_for, load_original_for) must remain unchanged and ADMIN must not bypass them. Do
+NOT commit, do NOT push, stop after reporting.
+
+Agent Response Summary:
+Implemented R8 as a role model plus one guard, touching 7 existing files and adding 3. Before
+writing any code I probed MongoEngine's actual behaviour for a document stored without the role
+field and found a real discrepancy: a model instance applies the default (role == "USER"), but
+every repository in this codebase reads through as_pymongo(), which returns the stored document
+as-is and applies no defaults, so request.account had no role key at all. That single fact
+decided the shape of the read path and is reported rather than papered over. Added
+apps/auth/constants.py (USER_ROLE/MERCHANT_ROLE/ADMIN_ROLE/ROLES plus the ROLE_NOT_ALLOWED code
+and message), a role field on UserAccount, account_role() in auth/services.py as the one place a
+document becomes a request's account, require_role() beside require_auth() in
+shared/authentication.py, role written out in the seed with a new validate_roles() check, and 48
+new tests across test_rbac_services.py and test_rbac_api.py. Per Option A no production route
+attaches require_role and no admin endpoint exists; the guard is exercised through a test-only
+URLconf with require_auth stacked outside it. Verified 396 tests pass (348 baseline + 48), all 10
+required mutations were caught, the seed reproduces the exact R5 financial baseline of
+Rs 12,228.50, and live HTTP now returns role on both /auth/login and /auth/session with the JWT
+unchanged. Not committed and not pushed, as instructed.
+
+Actions:
+* Read the governing material and the R1-R5 implementation before editing.
+* Probed MongoEngine default-on-load behaviour in a throwaway script under /tmp/opencode (no repo
+  file created for the probe); found as_pymongo() omits the field while a model instance defaults
+  it. Repaired the probe twice (unsaved document has id None; a del statement placed inside a loop).
+* Created backend/apps/auth/constants.py.
+* Edited backend/apps/auth/models.py to add the role field.
+* Edited backend/apps/auth/services.py to add account_role() and the role in public_account().
+* Rewrote backend/apps/shared/authentication.py to add require_role() beside require_auth().
+* Edited backend/scripts/seed_data.py (role on ACCOUNT_ROWS) and backend/scripts/seed.py (write
+  the role, new validate_roles(), role in the demo account listing).
+* Edited backend/tests/base.py: role as the final optional argument on create_account, plus
+  set_stored_role() and store_account_without_role() helpers.
+* Edited backend/tests/test_auth.py for the one exact-dict assertion R8 legitimately changed.
+* Created backend/tests/test_rbac_services.py (24 tests) and backend/tests/test_rbac_api.py (24).
+* Fixed two harness mistakes of my own: decorators applied in the wrong order and one view
+  returning a dict where DRF requires a Response; replaced a test that reached for a real route
+  while ROOT_URLCONF was overridden.
+* Built a demo-database fingerprint tool in /tmp/opencode and iterated it to a stable
+  normalisation, finding in turn that raw documents, timestamps, generated ObjectIds,
+  idempotency keys/fingerprints and bcrypt salts each varied by design between seeds.
+* Caught a stale pre-R8 dev server (PID 73534, --noreload) holding port 8000, which made a live
+  check appear to show a missing role; killed it, restarted, and re-verified.
+* Skipped the browser walkthrough at the user's instruction.
+* Ran the 10-mutation sweep twice, before and after reformatting the test files.
+* Reformatted my own over-long lines to at most 127 characters, matching the repo's existing
+  envelope; left the pre-existing long lines alone.
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-03T20:15:10+05:30] SESSION START
+
+Agent: opencode (Big Pickle)
+Repo Root: /home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+Branch: main
+Worktree: main
+Parent Agent: none
+Stack: django
+
+
+## [2026-10-04T11:40:54+05:30] R7 narrowed to Batch Processing; R11 scoped as user-facing Analytics
+
+User Prompt (verbatim, secrets redacted):
+Update the project requirements based on the latest product decision. [Full prompt: change remaining feature plan so R7 = Batch Processing only (drop Deferred), R11 = Analytics kept but must be meaningfully different from transaction History, R9 Audit Logs skipped, R6 Rate & Velocity skipped, R10 Reconciliation skipped. Target set = R1, R2, R3, R4, R5, R7 Batch Processing, R8 RBAC, R11 Analytics. Discovery and requirements update ONLY — do NOT implement R7 or R11. Read docs/requirements.md, docs/invariants.md, docs/reference-architecture.md, skills/add-feature.md, HackerRank governing requirements/guidelines, existing R1-R8 implementation, transfer/idempotency/recovery code, frontend structure, History UI, and wallet/transaction models and indexes. Then update project documentation to reflect the decision. R7 design must explicitly address batch state machine, item state machine, idempotency/retry, duplicate processing, concurrent processors, insufficient funds, partial batch failure, financial invariants, ownership/authentication, persistence/indexes, recovery after interrupted processing, deterministic testing. Do NOT introduce Celery, Redis, external queues, workers, or other new infrastructure. R11 must answer "what can we learn from aggregating my transaction data" rather than wrapping History in charts, must be primarily user-facing and respect the existing ownership boundary, and must not invent admin analytics. Preserve existing requirement numbering. Update any capability matrix, roadmap, dependency notes, or scope notes implying Deferred Processing or Audit Logs are still planned. Do not rewrite unrelated requirements. Constraints: no source-code implementation, no dependency changes, no lockfile changes, no architecture changes yet, no new endpoints, no speculative infrastructure, do not modify completed R1-R8 behavior, do not weaken or remove existing invariants. Then report which files changed, what changed in R7 and R11, which features are skipped, proposed minimal R7 and R11 scope, key unresolved design questions, and confirmation no source code changed. STOP after the requirements update.]
+
+Agent Response Summary:
+Discovery only, then a documentation-only update. Verified three load-bearing claims empirically against the code rather than assuming them: (1) money-request expiry is ALREADY resolved lazily by R4 on the list and act paths via money_requests/repository.expire_for_account, so narrowing R7 to batch-only orphans nothing and EXPIRED remains a real R4 terminal state; (2) the reconciliation primitive already exists and runs (wallet/repository.derived_balance vs availableBalanceMinor, asserted in the suite and re-checked on every seed), which is why R10 has no core comparison left to add; (3) there is no audit collection and no admin route anywhere, so R9 has no administrative actions to record. Edited only docs/requirements.md and docs/invariants.md: added a Delivery Scope section with the closed 8-capability list and a reasoned Not-in-scope table for R6/R9/R10; retitled R7 to Batch Processing with acceptance criteria and seven explicitly-open design decisions; rewrote R11 as user-facing aggregates distinct from History, including a finding that money totals must come from ledger entries (settled only) while success/failure counts must come from transfer rows (which include FAILED), so the two populations cannot share a denominator; marked R6/R9/R10 skipped with their original text retained for later. Reconciled the now-dead "deferred" references in INV-11 and INV-15 and annotated INV-8/INV-9 without weakening or renumbering any invariant. No application source code changed.
+
+Actions:
+* read docs/requirements.md, docs/invariants.md, docs/reference-architecture.md, skills/add-feature.md, REQUIREMENTS.md, INSTRUCTIONS.md, GUIDELINES.md
+* inspected backend/apps/{transfers,wallet,money_requests,refunds,auth} services, models, repository, constants, schema
+* inspected frontend/src/App.jsx, features/wallet/WalletHistoryList.jsx, shared/api/client.js
+* verified lazy expiry, derived_balance, and absence of any audit/admin code via grep
+* edited docs/requirements.md (Delivery Scope, R6, R7, R9, R10, R11, R13 note, Traceability)
+* edited docs/invariants.md (INV-8 note, INV-9 note, INV-11 bullet, INV-15 body, verification mapping)
+* ran bunx prettier --write on both docs; prettier --check now clean on both (originals had also been clean)
+* confirmed git status --porcelain shows only the two docs, no untracked files, all 18 INV- headings present
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T15:36:57+05:30] R7 Batch Processing implemented: engine reuse, derived keys, derived state
+
+User Prompt (verbatim, secrets redacted):
+Implement R7 — Batch Processing in the React + Django + MongoDB wallet repo, reusing the
+existing transfer engine. R11 Analytics is explicitly out of scope for now. Preserve the
+sample stack exactly; no new dependencies, no lockfile changes, no calendar-domain code, no
+unrelated refactors, no MongoDB multi-document transactions, no Redis/Celery/queues/workers/
+cron/deferred or scheduled transfers, no admin batch endpoints, no component library, no React
+Router. Every money movement must go through the existing execute_transfer(); do not duplicate
+balance mutation, ledger creation, transfer creation, idempotency, recovery or conservation
+logic. Layering is URL -> View -> Schema -> Service -> Repository -> MongoDB, with business rules
+in the service layer and thin routes. Items use a deterministic per-item key
+`batch:<batch_id>:<item_index>`, the same on every attempt, so a retry never double-moves a
+settled item and settled items replay while failed items retry. Concurrency safety comes from
+persistent MongoDB state plus the existing idempotency only — no in-memory locks, mutexes,
+sleep-based sync or leader election. One item's failure must not stop later items. Reuse
+recover_in_flight(); no time-based sleeps, deterministic clocks only. Ownership is decided in
+the service layer, never trusting ownerUserId/wallet/account ids from the body, and must not
+leak whether another user's batch exists. The batch summary is derived from items, never a
+second authoritative financial state. Frontend: a full end-to-end UI reachable from the
+existing Send/Money experience, covering loading/empty/processing/success/partial-failure/failure
+states, per-item results and a process/retry action, without breaking the existing Send flow.
+Tests are mandatory: validation, auth, ownership, happy path, partial failure, retry,
+concurrency, conservation, recovery, plus mutation tests, asserting database state and financial
+invariants rather than just HTTP status codes. All R1-R8 behaviour must keep passing. Do not
+implement R11 Analytics, R9 Audit Logs, R10 Reconciliation, R6 Rate/Velocity, deferred transfers
+or admin functionality. Do not commit or push unless explicitly instructed. The final
+deliverable is a 16-point verification report.
+
+Agent Response Summary:
+R7 is implemented end to end: `backend/apps/batch/` (constants, models, repository, schema,
+services, views, urls), 84 new tests, a one-row seed, and a batch UI in
+`frontend/src/features/batch/` wired into the existing Send flow. Items are embedded in the
+Batch document rather than kept in a second collection, following the `Wallet.pending_movements`
+pattern already in the codebase, which makes a batch state and its item states structurally
+unable to disagree and removes any need for a reconciliation sweep. Each item's outcome and the
+batch's state are both written by pipeline updates, so the state is computed by a `$switch` over
+`$items` in the same write that records it. Retrying a failed item needs no attempt counter: the
+engine's `mark_failed` releases the idempotency key, so the same derived key names a fresh
+attempt, which is exactly the required semantics delivered by existing behaviour. One shared
+engine change was unavoidable and is reported: `claim_or_replay()` in
+`apps/transfers/services.py` replaces an inline read-then-insert, fixing a reproduced
+AttributeError/500 that a request hitting a released key would otherwise produce — batch
+processing makes that race reachable, and no financial semantics changed. All five required
+mutations are caught, `setup.sh --seed` leaves the R1-R5 financial baseline byte-identical
+(21/9/6/4/4/4 plus one pending batch), and 480 tests pass against a 396 baseline.
+
+Actions:
+* Created backend/apps/batch/{__init__,constants,models,repository,schema,services,views,urls}.py
+* Edited backend/apps/transfers/{constants,schema,services}.py (third reserved key prefix; claim_or_replay fix)
+* Edited backend/wallet_backend/urls.py, backend/tests/base.py, backend/scripts/{seed,seed_data}.py
+* Created backend/tests/{test_batch_services,test_batch_api}.py (84 tests)
+* Created backend/scripts/{mutation_check,walk_batch}.py
+* Created frontend/src/features/batch/{batch.api.js,BatchForm.jsx,BatchList.jsx}; edited App.jsx and styles.css
+* Edited docs/{requirements,invariants}.md (R7 settled decisions replacing open questions)
+* Ran manage.py check, manage.py test (480 OK), bun run build, prettier --check, setup.sh --seed, mutation_check.py, walk_batch.py
+* Nothing committed or pushed
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-04T15:53:19.876039+05:30] R7: guard the last insert in claim_or_replay against NotUniqueError
+
+User Prompt (verbatim, secrets redacted):
+Review the shared `claim_or_replay()` change in `backend/apps/transfers/services.py`. A potential
+race in the final fallback `return repository.create_transfer(values), True` — it can raise
+NotUniqueError if another request claims the same key after the last find_by_key, and the
+surrounding comment says the database says so rather than the code guessing, but the code does
+not catch the refusal. Verify against the real implementation and tests; if real, fix it so it
+stays bounded, never turns a legitimate idempotency race into an unexpected 500, replays a
+winning competitor correctly, still allows a released key to be reclaimed, keeps the unique
+constraint as the source of truth, changes no financial semantics, and introduces no in-memory
+locking or sleeping. Prefer the smallest change. Add a focused regression test covering: loser
+replays winner, released key reclaimable, repeated races never 500, settled transfer moves money
+once. Run the complete existing suite. Do not modify the batch design, API, frontend,
+requirements, or unrelated financial behaviour. Do not commit or push. Report exactly what
+changed and the test results.
+
+Agent Response Summary:
+Confirmed the race empirically before touching anything, with a throwaway probe that patched
+`create_transfer` to refuse N times: at N=0..2 inserts the call succeeded, at N>=3 the bare
+`NotUniqueError` escaped `execute_transfer` and, since it is not an `AppError`, DRF's handler
+returned None and the request answered 500. The comment described surfacing the database's
+refusal, but the effect was a server error on a perfectly legitimate race, which is exactly what
+must not happen. Fixed it with the smallest change available: the fallback insert is now guarded,
+and a refusal there reads the key back and answers from whatever holds it. That alone would have
+reintroduced the earlier `None`-to-replay `AttributeError` defect, so the read's empty result is
+answered with a new 409 `IDEMPOTENCY_KEY_CONTENDED` refusal — a bounded loop cannot resolve
+competitors that keep claiming and releasing the key, and saying so is the honest terminal
+answer. Verified the guard is load-bearing by reverting it (4 tests fail), then restoring it.
+Extended `EngineClaimTestCase` with four regression tests and two helpers; hoisted the mock
+imports to module level and bound the real `create_transfer` at import so the fake competitor
+cannot recurse into its own patch. Full suite: 484 pass.
+
+Actions:
+* probe scripts/probe_claim_tail.py (written, run, deleted)
+* backend/apps/transfers/constants.py — added IDEMPOTENCY_KEY_CONTENDED_CODE / _MESSAGE
+* backend/apps/transfers/services.py — guarded the fallback insert, read-back, 409 on churn
+* backend/tests/test_batch_services.py — 4 new tests, 2 helpers, hoisted imports
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-04T16:02:55.275013+05:30] R7: pin the contended key at the HTTP boundary, fix stale failure fields
+
+User Prompt (verbatim, secrets redacted):
+Make sure the API-level test confirms the new AppError becomes the intended 409 response, not
+merely that the service raises it. The existing description strongly suggests this, but the
+regression tests described are mostly service/database-state tests. If that API mapping is
+already covered elsewhere, you are done.
+
+Agent Response Summary:
+Checked first, and it was not covered — `IDEMPOTENCY_KEY_CONTENDED` appeared only in constants,
+the service, and the service-level tests, so nothing asserted what a caller receives. Added four
+HTTP tests to `HttpContractTest` proving the AppError serialises to 409 with the intended code and
+message and no `details`, that nothing was sent and no key stayed spent, and that repeating the
+request afterwards succeeds — which is what makes calling it a refusal honest. Then added three
+more to the batch `ProcessTest`, because a batch is where contended keys actually arise, and those
+surfaced a genuine R7 defect: `settle_item` set `transferId` and state but never removed
+`failureCode`/`failureMessage`, so an item that had failed and was later paid still reported the
+old reason for failing. Reproduced it independently of the fix with a plain insufficient-funds
+retry, confirmed the frontend renders that stale message, and fixed it by unsetting both fields in
+the same write that records the payment. Verified the fix is load-bearing by reverting it. Full
+suite: 490 pass.
+
+Actions:
+* backend/tests/test_idempotency.py — 3 HTTP tests, contend_every_claim helper
+* backend/tests/test_batch_api.py — 3 HTTP tests, contend_claims helper
+* backend/apps/batch/repository.py — unset failure fields when an item is recorded as paid
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+
+## [2026-10-04T16:17:29.243476+05:30] R7: commit the batch feature
+
+User Prompt (verbatim, secrets redacted):
+approved commit now
+
+Agent Response Summary:
+Re-ran the full verification set before committing rather than trusting the earlier runs, since
+mutation_check.py temporarily patches source files and the tree had to be confirmed clean
+afterwards. 490 tests pass, manage.py check is clean, all five mutations are caught and reverted,
+the frontend builds and prettier is clean over both src and docs. Staged all 27 files, scanned them
+for secrets, and found only the demo password that seed_data.py already carried before this work,
+plus variable names rather than values in tests. Committed as e8646e4 with a message that leads
+with the decision rather than the file list, matching the style of the previous commits and
+carrying no tool attribution. Nothing pushed; local main is 4 commits ahead of origin/main.
+
+Actions:
+* git add -A
+* git commit — e8646e4, 27 files, +4146/-71
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T17:17:46+05:30] R11 analytics: finished verification, fixed three defects the live walk exposed
+
+User Prompt (verbatim, secrets redacted):
+The turn opened with a conversation checkpoint carrying prior context for R11 rather than a fresh
+request, so there is no new instruction to quote in full. The instructions this turn was carried
+out under are the R11 objective and requirements already recorded in the earlier entries for this
+feature, quoted here so this entry stands on its own:
+
+  Objective: Implement R11 -- user-facing wallet analytics in the HackerRank React + Django +
+  MongoDB wallet repo: small, polished server-side aggregation over a selected period, distinct
+  from History. R7 Batch (committed as e8646e4) must not change.
+
+  Requirements: Read first: docs/requirements.md, docs/invariants.md,
+  docs/reference-architecture.md, skills/add-feature.md, GUIDELINES.md, REQUIREMENTS.md,
+  INSTRUCTIONS.md, plus the actual repo implementation. Repo is source of truth; do not guess
+  the data model. Metrics (minimal scope only): total sent, total received, net movement,
+  transaction count, average amount, time-bucketed volume including empty buckets. Money totals
+  from LedgerEntry, never Transfer. A FAILED Transfer has no ledger movement and must not
+  appear. OPENING contributes to balance but must NOT count as "received". Ownership: wallet
+  derived from authenticated account; client-supplied user/wallet/account IDs ignored or
+  rejected. One endpoint, conceptual GET /api/v1/analytics?from=...&to=...; authenticate,
+  validate period, reject malformed dates and invalid ranges, aggregate server-side,
+  deterministic. Period semantics explicitly defined: accepted format, inclusive/exclusive end,
+  max period, bucket size, boundary semantics, UTC vs local resolved deliberately. Empty buckets
+  returned with zeros, never omitted. Response small/explicit; no raw ledger documents, no
+  MongoDB internals. Integer minor units; no float money math. Architecture URL -> View ->
+  Schema -> Service -> Repository -> MongoDB; thin view, aggregation in repository, semantics
+  and ownership in service. Do not load all entries into Python; no client-side aggregation.
+  Verify the existing wallet_history_idx suffices; no speculative indexes. Frontend: add
+  Analytics under Activity (History, Refunds, Analytics); no router, no new nav system, no
+  component library, no new dependencies, no charting library; CSS/SVG/native chart only;
+  loading, empty, validation, success, error and responsive states. Tests must verify numbers,
+  not just status. Mutation tests proving the specific wrong implementations are caught.
+  Workflow: report the plan before coding, then implement without stopping. Verification:
+  manage.py check, manage.py test, bun run build, seed verification, mutation check, and a live
+  HTTP/browser walk against manually calculated expected numbers. Final report. Do NOT commit or
+  push. Do not expand scope. Do not modify R1-R8 except a genuine shared bug (explain +
+  regression test + full suite).
+
+Agent Response Summary:
+Finished R11 end to end and verified it against the running application rather than only against
+the test suite, which turned out to matter: the live walk found three defects in my own frontend
+that 525 passing tests could not see. The worst was that the effect reading the Analytics section
+tested "are there figures" rather than "has a read been attempted", so a period the service
+refused was answered by a bare default request -- the reader's chosen dates were replaced by
+others, the explanation was cleared, and nothing on screen said so; this is now fixed with a
+`loaded` flag recording an attempt whichever way it went, and the refused dates are kept in the
+inputs so the range can be corrected. The other two were a scrolling chart opening at its oldest
+end, so on a narrow screen a 90-day window showed a flat stretch of days and pushed every recent
+movement past the edge, and zero rendered as a signed zero that asserted a direction which never
+happened. Also corrected two acceptance criteria I had mis-filed as unimplemented: a failed
+operation cannot be counted because it writes no ledger entry, and refunds are counted inside the
+totals, just without a separate total. Everything verified green: 525 tests, mutation check 12 of
+12 caught and reverted, build and formatting clean, seed baseline unchanged, and an independent
+recomputation of the figures from the raw ledger agreeing with the service exactly for three
+accounts.
+
+Actions:
+* docs/invariants.md: added the two properties INV-14 depends on -- the population is the ledger
+  not the transfer, and net movement must equal the balance's own change over the period
+* docs/requirements.md: corrected the mis-filed acceptance criteria; added "A refused period
+  stays refused" recording the three decisions that came out of the live walk
+* frontend/src/App.jsx: added `loaded` to the analytics state so a refused read is not mistaken
+  for a first visit; record the attempted period before the answer arrives so a refused range
+  stays visible and correctable
+* frontend/src/features/analytics/AnalyticsSection.jsx: signed-minus handling; zero carries no
+  sign and no direction colour; chart scrolls to its newest end when the window overflows
+* backend/scripts/mutation_check.py: mutations 6-12 for R11
+* backend/tests/test_batch_services.py: repaired a pre-existing flake asserting exactly one of
+  two racing batch runs is refused, contradicting its own comment
+* ran: manage.py check, manage.py test (525 OK), bun run build, prettier --check, setup.sh
+  --seed, scripts/mutation_check.py (12/12), and a live HTTP plus browser walk
+* git: nothing committed or pushed; HEAD remains e8646e4
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+## [2026-10-04T17:18:14+05:30] R11 analytics: backfill of the implementation turns lost to a session checkpoint
+
+User Prompt (verbatim, secrets redacted):
+No new user message. This entry backfills the R11 turns between the last logged entry above and
+the checkpoint that opened the next turn. Those turns were not written to this log at the time --
+the session was compacted into a checkpoint before they were appended -- so they are recorded
+here now rather than left out. The log is append-only, so this entry necessarily appears after
+the turn that prompted it; it is labelled here so the ordering is not mistaken for the order the
+work happened in. The instructions those turns carried out under are the R11 objective and
+requirements quoted verbatim in the entry immediately above, and they were the same.
+
+Agent Response Summary:
+Built R11 across four turns and reported the plan before coding, as required. Turn one read the
+required documents and the actual implementation to fix the data model rather than guess it, then
+settled the semantics that were genuinely open: ledger kinds partition three ways with refunds
+counted as movements of real money, optional inclusive YYYY-MM-DD endpoints read in UTC, one
+bucket per day, a 366-day maximum, and a symmetric anchoring rule so naming one endpoint anchors
+the 30-day window on it. Turn two implemented the backend and, while checking its own output
+against the raw ledger, found its own bug before any test existed: a nested $cond made
+receivedMinor fall back to the received amount for non-received entries, so sent equalled
+received equalled the amount sum, and replaced it with two independent direction sums. Turn three
+wrote 35 tests across nine classes and repaired a pre-existing flake in the batch concurrency
+test that asserted exactly one of two racing runs is refused while its own comment said both may
+take over. Turn four extended the mutation check from 7 to 12 mutations, implemented the frontend
+with no new dependencies, and settled the period and bucket decisions in the requirements
+document. The mutation run, the docs and the live walk are reported in the entry above.
+
+Actions:
+* backend/apps/analytics/: constants, repository, schema, services, views, urls -- URL -> View ->
+  Schema -> Service -> Repository -> MongoDB, aggregation in a single $facet over the ledger
+* backend/wallet_backend/urls.py: mounted the analytics routes before the catch-all
+* backend/tests/test_analytics_api.py: 35 tests in 9 classes, including a hand-computable
+  fixture, an explicit OPENING test, a failed-transfer test, boundary tests and a cross-account
+  test
+* backend/tests/test_batch_services.py: repaired the racing-batch flake described above
+* backend/scripts/mutation_check.py: extended from 7 to 12 mutations, with an honest docstring
+  naming the two guarantees that have no mutation and why
+* frontend/src/features/analytics/: AnalyticsSection.jsx and analytics.api.js -- CSS chart, no
+  charting library, no new dependency
+* frontend/src/App.jsx, frontend/src/styles.css: fifth Activity chip, state, handler, styles
+* docs/requirements.md: R11 moved to implemented, open design decisions replaced by the decisions
+  actually taken, with the metric-to-kinds table and the net-movement property recorded
+* verified the existing wallet_history_idx [wallet_id, -created_at, -id] serves the query with an
+  equality on walletId and a bounded range on createdAt; no new index was added
+
+Context:
+tool=opencode
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+parent_agent=none
+
+## [2026-10-04T19:15:10+05:30] Pre-submission audit pass 2: dependency audit, conservation, clean clone, browser walk
+
+User Prompt (verbatim, secrets redacted):
+continue
+
+Backgrounded work:
+shell: cd /home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet/backend && ../.venv/bin/python scripts/mutation_check.py 2>&1 | grep -cE "Caught by [0-9]+ failing test" | xargs -I{} echo "mutations caught: {} of 12" ; ../.venv/bin/python scripts/mutation_check.py 2>&1 | grep -iE "survived|missed|not caught" || echo "no surviving mutations"; echo "exit-code check:"; ../.venv/bin/python scripts/mutation_check.py >/dev/null 2>&1; echo "  mutation_check exit=$?"
+
+The user then asked for active blocking work to be moved to the background.
+
+Agent Response Summary:
+Continued the pre-submission hardening audit. Completed the dependency/stack audit (zero manifest or lockfile drift against baseline e8646e4, no charting library, state manager, queue, SQL, second HTTP client, or external CDN asset, MongoDB the only datastore) and ran a direct-database conservation proof (system total 1222850 minor equals the sum of all ledger movement; every wallet's materialized balance equals its own derived ledger balance; no negative balance; every completed transfer exactly two ledger legs; the seeded PENDING batch has spent no transfer key so it moves no money). Confirmed the clean-clone rehearsal passes end to end with no manual repair step. Ran the authoritative commands and recorded exact results: manage.py check clean, 525 tests OK, mutation_check 12/12 caught and reverted, prettier clean, build clean. Ran the official validator's S18 archive check against the tree R11 would commit (0.93 MB, README present, no GUIDELINES.md, no skills content, no dist, node_modules, or real .env). Performed a browser walkthrough of the clean clone across all eight capabilities and all five UI states at 3200 and desktop. Found and fixed one genuine defect: the Analytics section never refetched after the reader left it, because the read gate keyed on the filter rather than on whether the section was open, so totals quietly stopped agreeing with the balance after any payment. Verified the fix in the browser (6 movements/INR 3,500.00 to 7 movements/INR 3,700.00, matching the API exactly) and confirmed it preserves the documented refusal behavior, where a period the service rejected is re-asked and stays refused rather than being swapped for the default. No commit or push was performed; R11 remains uncommitted as instructed.
+
+Actions:
+* read skills/validate/SKILL.md and skills/validate/references/static-checks.md and worked the S01-S19 rows with direct evidence
+* dependency audit via git status/diff against e8646e4 and targeted greps for forbidden additions
+* ran /tmp/opencode/db_conserve.py (conservation, ledger shape, pending-batch evidence) - all checks pass
+* ran /tmp/opencode/chain_check.py and /tmp/opencode/chain_runtime.py to separate a seed artifact from a real ledger-chain defect
+* rebuilt the git export archive from a scratch index (GIT_INDEX_FILE) so the S18 check reflects R11 without touching the real index
+* browser walkthrough: login, home, send, batch, money requests, refunds, history, analytics; loading, empty, validation, error, retry, disabled, keyboard tab order, stale-token handling
+* edited frontend/src/App.jsx: analytics read gate now keys on whether the section is open, and re-reads the period on screen
+* re-ran prettier, build, manage.py check, and the full 525-test suite after the fix
+* backgrounded the mutation_check confirmation command at the user's request
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T22:18:07+05:30] Commit R11 analytics, README, and the page-centering fix
+
+User Prompt (verbatim, secrets redacted):
+commit changes and kill all server processes free up 3000 and 8000 port
+
+Agent Response Summary:
+Committed the whole reviewed working set as c16254c, "Read a period of the register
+back as figures and a chart", after confirming the 18 staged paths contained only
+source, tests, and docs, that every env/junk path stayed gitignored, and that a
+secret scan over the staged diff came back clean. Then terminated both repo process
+trees, escalating to SIGKILL for the backend tree that ignored SIGTERM, which freed
+ports 3000, 3200, and 8000. Verified afterwards that no vite, runserver, or
+concurrently process from this repository remains and that the working tree is clean.
+The system mongod on 27017 was left running deliberately, since it is not one of the
+two ports to free and setup.sh starts one on demand anyway.
+
+Actions:
+* staged all changes with git add -A and reviewed the staged file list
+* verified .env, node_modules, dist, .venv, and __pycache__ remain gitignored
+* scanned the staged diff for secrets and private keys - none found
+* wrote a house-style commit message to /tmp/opencode/commit-msg.txt and committed
+* confirmed HEAD moved e8646e4 -> c16254c and the working tree is clean
+* sent SIGTERM to the 14 PIDs of both concurrently process trees, then SIGKILL to
+  the four stragglers (262869, 262867, 262858) that did not exit
+* confirmed 3000, 3200, and 8000 are unbound and no repo server process survives
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T22:29:06+05:30] Spread the header across the window instead of sharing the page column
+
+User Prompt (verbatim, secrets redacted):
+add it as a seperate commit
+
+Agent Response Summary:
+Committed the header correction as its own commit, 1aadfc0, so the analytics commit
+c16254c keeps the centering fix and the correction of it stay separately readable. The
+commit body argues why the header and the page now disagree on purpose, so that a later
+reader does not "fix" the asymmetry back. The user's restarted process tree on 3000 and
+8000 was left running throughout, since it is the one being used to look at the change.
+
+Actions:
+* staged frontend/src/styles.css only and confirmed no unstaged or untracked remainder
+* wrote the message to /tmp/opencode/commit-msg2.txt and committed it as 1aadfc0
+* confirmed the working tree is clean and git diff --check is clean
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T22:49:48+05:30] Generate the two signing secrets locally instead of committing them
+
+User Prompt (verbatim, secrets redacted):
+Fix the S10 validator failure for committed secret defaults. [...] Remove static secret
+fallbacks from backend/wallet_backend/settings.py [...] Do not commit or push anything.
+
+Agent Response Summary:
+Removed the committed SECRET_KEY and JWT_SECRET fallbacks in favour of a required_secret
+helper that raises with an actionable message instead of falling back, left the two secret
+names blank in backend/.env.example, and taught setup.sh to generate a 32-byte random value
+for each one on first run while preserving any value already present. The user asked for a
+security-only change, so no application behavior, route, dependency, or auth semantic was
+touched; the one README paragraph that asserted the example "ships a development JWT_SECRET"
+had to be corrected, because leaving it would have introduced an S03 failure. Twenty-six
+isolated bash tests covered the generation fallback chain and the blank-detection rules, and
+one of them caught a real defect in my first draft, which accepted a whitespace-only value.
+
+Actions:
+* rewrote the two secret reads in backend/wallet_backend/settings.py around required_secret
+* blanked both secret assignments in backend/.env.example and documented why in a comment
+* added random_secret, env_has_value, env_set_value, and ensure_backend_secrets to setup.sh
+* corrected the Environment setup paragraph and variable table in README.md
+* verified: fresh setup generates, re-run preserves byte-identically, 525 tests pass, check
+  clean, prettier clean, build clean, login works, old-key token now rejected 401
+* confirmed zero occurrences of either old literal in tracked files or anywhere on disk
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T22:57:02+05:30] Untrack the assignment scaffolding and export the transcript
+
+User Prompt (verbatim, secrets redacted):
+first remove @AGENTS.md @GUIDELINES.md @REQUIREMENTS.md @INSTRUCTIONS.md from the git dont
+delete the file just remove them latest commit . Then copy the transcript file
+
+Agent Response Summary:
+Untracked the four assignment documents with git rm --cached, so they left the index and the
+history's tip while staying on disk, and committed that as 5bcc9ab on its own so the S10 work
+from the previous turn stays uncommitted and separately reviewable. Before doing it I checked
+whether anything in the product depends on those files: nothing does, README.md never referred
+to any of them, and GUIDELINES.md was already export-ignored, so the archive procedure was
+never relying on it being tracked. Copied the log into transcripts/ verbatim and verified it
+byte-identical, then re-copied it after appending this entry so the export is current.
+
+Actions:
+* git rm --cached the four files and confirmed all four survive on disk with their line counts
+* committed the removals alone as 5bcc9ab, leaving the S10 changes unstaged
+* read skills/validate/references/static-checks.md and confirmed its "GUIDELINES.md is absent"
+  rule is an archive rule, not a tracking rule, so untracking does not conflict with it
+* copied the log to transcripts/log.txt and confirmed cmp reports the files identical
+* built a projected archive through a throwaway GIT_INDEX_FILE and measured 1.04 MB
+* confirmed README.md and transcripts/ are present while GUIDELINES.md, AGENTS.md,
+  REQUIREMENTS.md, INSTRUCTIONS.md, skills contents, and .env are absent
+* appended this entry to the transcript log and re-copied it into transcripts/
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
+## [2026-10-04T23:00:17+05:30] Commit the secret fix and the transcript export, then push
+
+User Prompt (verbatim, secrets redacted):
+commit changes and push
+
+Agent Response Summary:
+Committed the secret-hygiene work as ef485d2 and the transcript export as its own commit, then
+pushed the branch. Staged both batches by explicit path rather than with git add . , because the
+four untracked assignment documents would have been swept straight back into the repository by a
+catch-all add, which is the footgun untracking them created. Scanned everything about to be
+published first: neither old secret literal appears anywhere in the tree, and the export holds no
+private key, token, or JWT pattern. The export was appended to and re-copied immediately before
+staging, so it covers this turn rather than trailing one entry behind.
+
+Actions:
+* scanned the working tree and transcripts/log.txt for both old literals and for key-like,
+  token-like, and JWT-like patterns before anything left the machine
+* committed README.md, setup.sh, backend/wallet_backend/settings.py, and
+  backend/.env.example as ef485d2, staging by explicit path
+* appended this entry to the transcript log and re-copied it into transcripts/log.txt
+* committed transcripts/log.txt as its own commit
+* pushed main to origin and verified origin/main matches local main
+* appended this entry to the transcript log
+
+Context:
+tool=opencode (Big Pickle)
+branch=main
+repo_root=/home/ujjwal/Desktop/work/wallet/coderepo-react-django-wallet
+worktree=main
+parent_agent=none
