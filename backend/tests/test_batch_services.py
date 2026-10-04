@@ -472,18 +472,24 @@ class ConcurrencyTestCase(BatchTestCase):
 
         # Which of the two runs gets to do the work is a matter of timing and is not the
         # guarantee. Both may take the abandoned claim over and both be answered, or one may
-        # take it and find the other already claimed. Only the movement count is fixed.
+        # take it and find the other already claimed. Only the movement count is fixed, so
+        # what is asserted is that every run was answered and that every answer was one a
+        # caller can act on: a finished batch, or a refusal naming the run that holds the
+        # claim. Asserting that exactly one of them is refused would be asserting the
+        # interleaving rather than the invariant, and would fail whenever both runs happen
+        # to read the claim as abandoned before either has written to it.
         with self.subTest("every run got an answer it could act on"):
-            self.assertEqual(len([o for o in outcomes if isinstance(o, dict)]), len(outcomes) - 1)
-            self.assertIn(
-                outcomes[1] if isinstance(outcomes[1], str) else outcomes[0],
-                (BATCH_IN_PROGRESS_CODE,),
-            )
-
             for outcome in outcomes:
-                if isinstance(outcome, dict):
-                    self.assertEqual(outcome["batch"]["summary"]["completedItems"], 3)
-                    self.assertEqual(outcome["wallet"]["availableBalanceMinor"], OPENING - 60000)
+                if not isinstance(outcome, dict):
+                    self.assertEqual(outcome, BATCH_IN_PROGRESS_CODE)
+                    continue
+
+                self.assertEqual(outcome["batch"]["summary"]["completedItems"], 3)
+                self.assertEqual(outcome["wallet"]["availableBalanceMinor"], OPENING - 60000)
+
+            # At least one run must have done the work: the claim is taken over by one run
+            # or the other, so there is no interleaving in which neither of them has it.
+            self.assertGreaterEqual(len([o for o in outcomes if isinstance(o, dict)]), 1)
 
     def test_a_fresh_claim_is_not_taken_over(self):
         batch = self.make_batch((FRIEND_EMAIL, 10000))

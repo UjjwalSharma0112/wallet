@@ -1,11 +1,18 @@
-"""Mutation testing for R7 — batch processing.
+"""Mutation testing for R7 batch processing and R11 analytics.
 
 A test that passes only because the code is right is worth nothing until the code is wrong and
-the test says so. Each mutation below makes one of the guarantees this feature relies on false
+the test says so. Each mutation below makes one of the guarantees these features rely on false
 — in the smallest way that makes it false — and the whole suite is then run. A mutation that
 the suite still passes is not a safe mutation, it is a guarantee nothing is holding up.
 
 Every mutation is reverted afterwards, and the suite is run once more to prove the revert.
+
+Two guarantees have no mutation here, and it would be dishonest to invent one. The figures are
+summed in the database rather than in the client, which is a fact about where the code is rather
+than about what it computes; there is no JavaScript test runner in this repository and adding one
+would mean adding a dependency. And a refused transfer cannot appear in the totals because the
+pipeline reads the ledger and a refused transfer writes no entry — mutation 3 breaks that by
+reading the wrong collection, which is the only way to break it here.
 
 Run it from `backend/` with `../.venv/bin/python scripts/mutation_check.py`.
 """
@@ -71,6 +78,87 @@ MUTATIONS = [
         "why": (
             "The debit would no longer be refused when the wallet cannot cover it, so money "
             "would be created rather than moved and the total would stop being conserved."
+        ),
+    },
+    {
+        "name": "6. Count the opening credit as money received",
+        "file": "apps/analytics/constants.py",
+        "old": "RECEIVED_KINDS = [TRANSFER_IN_KIND, REFUND_IN_KIND]",
+        "new": 'RECEIVED_KINDS = [TRANSFER_IN_KIND, REFUND_IN_KIND, "OPENING"]',
+        "why": (
+            "The opening credit funds a wallet rather than being paid into it by anybody, so "
+            "counting it would report the funding as activity and net movement would no "
+            "longer be the change the wallet's own ledger recorded."
+        ),
+    },
+    {
+        "name": "7. Ignore whose ledger is being summed",
+        "file": "apps/analytics/repository.py",
+        "old": '                "walletId": ObjectId(wallet_id),\n',
+        "new": "",
+        "why": (
+            "Every wallet's movements would be added together, so an account would read the "
+            "whole system's activity as its own — including money it never touched."
+        ),
+    },
+    {
+        "name": "8. Read the totals from transfer rows",
+        "file": "apps/analytics/repository.py",
+        "old": "from apps.wallet.models import LedgerEntry",
+        "new": "from apps.transfers.models import Transfer as LedgerEntry",
+        "why": (
+            "A transfer row also exists for operations that were attempted and failed, so "
+            "reading totals from it mixes a population that moved money with one that did "
+            "not. In its crudest form — the collections having no fields in common — the "
+            "figures collapse rather than come out subtly wrong, and the arithmetic tests "
+            "catch that."
+        ),
+    },
+    {
+        "name": "9. Leave out the days nothing happened on",
+        "file": "apps/analytics/services.py",
+        "old": '"volume": [bucket_row(label, buckets.get(label)) for label in period_days(from_date, to_date)],',
+        "new": '"volume": [bucket_row(label, buckets[label]) for label in buckets],',
+        "why": (
+            "The series would cover only the days that had entries, so a caller would have to "
+            "infer the gaps and a chart could not tell an absent day from a day of no height."
+        ),
+    },
+    {
+        "name": "10. Take a total the caller supplied",
+        "file": "apps/analytics/views.py",
+        "old": (
+            '    return Response({"data": services.account_analytics(str(request.account["_id"]), from_date, to_date)})'
+        ),
+        "new": (
+            "    figures = services.account_analytics(str(request.account[\"_id\"]), from_date, to_date)\n\n"
+            '    return Response({"data": {**figures, "sentMinor": int(request.query_params.get("sentMinor", figures["sentMinor"]))}})'
+        ),
+        "why": (
+            "The response would become a function of the query rather than of the ledger, "
+            "which is what a client-side total looks like once it reaches the server: any "
+            "caller could name any figure."
+        ),
+    },
+    {
+        "name": "11. Put the last day of a period outside it",
+        "file": "apps/analytics/repository.py",
+        "old": "return datetime.combine(to_date + timedelta(days=1), MIDNIGHT, tzinfo=timezone.utc)",
+        "new": "return datetime.combine(to_date, MIDNIGHT, tzinfo=timezone.utc)",
+        "why": (
+            "The inclusive endpoint would become exclusive, so the day a caller named as the "
+            "end of a period would report nothing at all."
+        ),
+    },
+    {
+        "name": "12. Cut the day boundaries in the reader's timezone",
+        "file": "apps/analytics/repository.py",
+        "old": '"timezone": BUCKET_TIME_ZONE}',
+        "new": '"timezone": "Asia/Kolkata"}',
+        "why": (
+            "A bucket would be a local day rather than a UTC one, so the same movement would "
+            "be reported in a different bucket depending on the server, and a movement at "
+            "midnight would fall in the previous day."
         ),
     },
 ]

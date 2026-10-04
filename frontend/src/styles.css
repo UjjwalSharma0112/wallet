@@ -8,6 +8,17 @@
 	--accent: #3fb98a;
 	--radius: 12px;
 	--font-body: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+	/* One reading column, shared by the header and the main area so the mark, the
+	   navigation, the account, and the page content all line up on the same edges.
+	   `--content-pad` is that gutter on a narrow window and the leftover space divided
+	   into two on a wide one, which centers the column without a wrapper element and
+	   without capping the header's own background, which has to stay full-bleed. The
+	   `max()` is what keeps it responsive: once the window is narrower than the column
+	   plus both gutters, the padding stops growing and the content simply fills. */
+	--content-max: 760px;
+	--content-gutter: 24px;
+	--content-pad: max(var(--content-gutter), calc((100% - var(--content-max)) / 2));
 }
 
 *,
@@ -45,7 +56,8 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: 18px 24px;
+	padding-block: 18px;
+	padding-inline: var(--content-pad);
 	border-bottom: 1px solid var(--border);
 	background: var(--surface-raised);
 }
@@ -72,7 +84,8 @@ body {
 
 .app-shell-main {
 	flex: 1;
-	padding: 24px;
+	padding-block: 24px;
+	padding-inline: var(--content-pad);
 }
 
 /* While there is nothing but the sign-in card on the page, put it in the middle
@@ -217,7 +230,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
-	max-width: 760px;
+	max-width: var(--content-max);
 }
 
 .wallet-card {
@@ -659,6 +672,226 @@ body {
 	margin: 0;
 	color: var(--text-muted);
 	font-size: 14px;
+}
+
+/* Analytics. A different kind of screen from the register, so it is laid out as a small
+   dashboard: a row of figures, then a chart of the period. The colors are the two the
+   history already uses for money out and money in, so a bar means the same thing here as the
+   signed amount on a row does — a shared vocabulary rather than a second palette. */
+.analytics {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.analytics-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 10px;
+}
+
+.analytics-range {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+/* The date controls are the service's own boundaries, so they are labeled rather than left
+   as two unlabeled boxes: which of them is the start and which is the end is the difference
+   between a period and its mirror. */
+.analytics-range-note {
+	margin: 8px 0 0;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.analytics-metrics {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 10px;
+	margin-top: 18px;
+}
+
+/* While a new period is being read the previous figures stay on screen, dimmed rather than
+   replaced, so the reader is not shown zeros for a second while the service answers. */
+.analytics-metrics-stale {
+	opacity: 0.55;
+}
+
+.analytics-metric {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 13px 15px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-raised);
+}
+
+.analytics-metric-loading {
+	gap: 9px;
+	justify-content: center;
+}
+
+.analytics-metric-label {
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.analytics-metric-value {
+	font-size: 21px;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+
+.analytics-metric-out .analytics-metric-value {
+	color: #f0a294;
+}
+
+.analytics-metric-in .analytics-metric-value,
+.analytics-metric-positive .analytics-metric-value {
+	color: var(--accent);
+}
+
+.analytics-metric-negative .analytics-metric-value {
+	color: #f0a294;
+}
+
+.analytics-metric-note {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.analytics-volume {
+	margin-top: 20px;
+	padding: 15px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-raised);
+}
+
+.analytics-volume-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.analytics-subheading {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--text-muted);
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.analytics-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.analytics-legend-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.analytics-swatch {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+}
+
+.analytics-swatch-out {
+	background: #f0a294;
+}
+
+.analytics-swatch-in {
+	background: var(--accent);
+}
+
+/* One column per day, all sharing the height of the busiest day in the period. The columns
+   are a flex row that scrolls rather than a grid, so a 90-day window stays readable on a
+   phone instead of shrinking every day into a hairline. */
+.analytics-bars {
+	display: flex;
+	align-items: flex-end;
+	gap: 3px;
+	height: 150px;
+	margin-top: 14px;
+	overflow-x: auto;
+	padding-bottom: 4px;
+}
+
+.analytics-bars-loading {
+	opacity: 0.55;
+}
+
+.analytics-bar-column {
+	display: flex;
+	flex: 1 0 12px;
+	min-width: 12px;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	height: 100%;
+}
+
+.analytics-bar-pair {
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	gap: 1px;
+	width: 100%;
+	flex: 1;
+}
+
+/* A day with money on it keeps a sliver of height even when it is tiny against the peak, so
+   that "a little" is not drawn as "nothing" — which is the mistake a zero-height bar makes
+   hardest to see. A day with no money on it has no bar at all, which is what it means. */
+.analytics-bar {
+	width: 42%;
+	min-height: 0;
+	border-radius: 3px 3px 0 0;
+	transition: height 160ms ease;
+}
+
+.analytics-bar-out {
+	background: #f0a294;
+}
+
+.analytics-bar-in {
+	background: var(--accent);
+}
+
+.analytics-bar-count {
+	color: var(--text-muted);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+}
+
+.analytics-volume-axis {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	margin-top: 6px;
+	color: var(--text-muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.analytics-axis-note {
+	font-variant-numeric: normal;
 }
 
 /* Header navigation. Two pages, so this is a plain row of buttons rather than the pill the
@@ -1118,5 +1351,16 @@ body {
 
 	.request-actions {
 		justify-content: flex-start;
+	}
+
+	/* The period controls stack under the presets on a phone, so a day of the chart is not
+	   squeezed by a date input sitting beside it. */
+	.analytics-controls {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.analytics-metrics {
+		grid-template-columns: minmax(0, 1fr);
 	}
 }

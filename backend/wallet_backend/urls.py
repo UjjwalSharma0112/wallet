@@ -11,6 +11,7 @@ def unknown_api_route(request, path):
 
 urlpatterns = [
     path("api/v1/health", health),
+    path("api/v1/", include("apps.analytics.urls")),
     path("api/v1/", include("apps.auth.urls")),
     path("api/v1/", include("apps.wallet.urls")),
     path("api/v1/", include("apps.transfers.urls")),

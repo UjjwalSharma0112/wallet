@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnalyticsSection } from "./features/analytics/AnalyticsSection.jsx";
+import { analytics as readAnalytics } from "./features/analytics/analytics.api.js";
 import { authApi } from "./features/auth/auth.api.js";
 import { BatchForm } from "./features/batch/BatchForm.jsx";
 import { BatchList } from "./features/batch/BatchList.jsx";
@@ -36,6 +38,7 @@ const ACTIVITY_FILTERS = [
 	{ id: "sent", label: "Sent" },
 	{ id: "received", label: "Received" },
 	{ id: "refunds", label: "Refunds" },
+	{ id: "analytics", label: "Analytics" },
 ];
 
 const PAGE_SIZE = 25;
@@ -45,6 +48,17 @@ const EMPTY_REQUESTS = { requests: [], total: 0, offset: 0 };
 const EMPTY_FILTERS = { role: "", state: "" };
 const EMPTY_REFUNDS = { refunds: [], total: 0, offset: 0 };
 const EMPTY_BATCHES = { batches: [], total: 0, offset: 0 };
+// Analytics is not a register, so there are no rows here to hold. What it carries is the
+// period the service reported back and the figures it read for it, which is why this is not
+// shaped like the other pages: there is nothing here to page through.
+//
+// `loaded` is not the same question as "are there figures", and the difference matters. Without
+// it a section that has just been refused looks identical to one that has never been asked,
+// and the effect that reads the section on open answers the refusal by asking again for the
+// bare default — replacing the period the reader chose with a different one and clearing the
+// message that explained why. `loaded` records that an attempt has been made, whichever way
+// it went, so the next read has to be a deliberate one.
+const EMPTY_ANALYTICS = { figures: null, from: "", to: "", loading: false, error: "", loaded: false };
 
 /** Decide which field, if any, a refusal from the service belongs to. */
 function fieldErrorsFrom(error) {
@@ -139,6 +153,7 @@ export default function App() {
 	const [batch, setBatch] = useState(EMPTY_TRANSFER);
 	const [batchLoading, setBatchLoading] = useState(false);
 	const [batchRun, setBatchRun] = useState({});
+	const [analytics, setAnalytics] = useState(EMPTY_ANALYTICS);
 	// The filters the list is showing, held as a ref as well as in state. The list needs the
 	// state to mark the pressed chips, but the callbacks that read requests must not be
 	// rebuilt every time a chip changes, or the boot effect that reads the session would run
@@ -170,7 +185,39 @@ export default function App() {
 		setBatch(EMPTY_TRANSFER);
 		setBatchLoading(false);
 		setBatchRun({});
+		setAnalytics(EMPTY_ANALYTICS);
 	}
+
+	/**
+	 * Read the figures for a period, from the ledger, on the server.
+	 *
+	 * The period is passed to the service rather than measured here, because a total worked
+	 * out in the browser from the rows it happens to hold would be a function of how much
+	 * history had been paged rather than of what happened. Naming no period asks the service
+	 * for its default window, which keeps the choice of what "the last 30 days" means in one
+	 * place.
+	 */
+	const loadAnalytics = useCallback(async (period) => {
+		// The period being asked for is recorded before the answer arrives, not after it.
+		// A period the service refuses is still the period the reader asked for, so it has to
+		// stay on screen to be corrected — showing the previous one instead would leave them
+		// reading a range they never chose, next to a complaint about a range they cannot see.
+		setAnalytics((current) => ({
+			...current,
+			loading: true,
+			error: "",
+			from: period?.from || current.from,
+			to: period?.to || current.to,
+		}));
+
+		try {
+			const figures = await readAnalytics(period?.from, period?.to);
+
+			setAnalytics({ figures, from: figures.from, to: figures.to, loading: false, error: "", loaded: true });
+		} catch (error) {
+			setAnalytics((current) => ({ ...current, figures: null, loading: false, error: error.message, loaded: true }));
+		}
+	}, []);
 
 	/** Read one page of the caller's own batches, newest first. */
 	const loadBatches = useCallback(async (offset = 0) => {
@@ -648,6 +695,44 @@ export default function App() {
 		return () => window.removeEventListener("wallet-session-expired", handleExpired);
 	}, []);
 
+	// Analytics is the one part of Activity that is not already in hand: it is a measurement
+	// of a period rather than a page of the register, so it is read when it is opened instead
+	// of at sign-in. Reading it eagerly would cost every session a query it mostly never
+	// looks at, and the figures are only meaningful against a period the reader chose.
+	//
+	// The trigger is `loaded`, not the presence of figures. A refused period leaves no figures,
+	// and asking again on the strength of that would answer the reader's own range with the
+	// default one — a different period, no error, and nothing on screen saying so. Once a read
+	// has been attempted the next one is the reader's to ask for.
+	//
+	// What is asked for is the period on screen rather than a bare request, so re-opening the
+	// section re-reads the range the reader was last looking at. On a first visit both dates
+	// are empty, which the client already reads as "no dates given", so this is the default
+	// thirty-day window and nothing more.
+	//
+	// `page` is part of the trigger because leaving this section is not a change of filter: the
+	// filter is still "analytics" while the reader is on another page, so keying on the filter
+	// alone would never notice the section being closed and reopened.
+	const analyticsOpen = page === "activity" && activityFilter === "analytics";
+
+	useEffect(() => {
+		if (analyticsOpen && !analytics.loaded && !analytics.loading) {
+			loadAnalytics({ from: analytics.from, to: analytics.to });
+		}
+	}, [analyticsOpen, analytics.loaded, analytics.loading, analytics.from, analytics.to, loadAnalytics]);
+
+	// Closing the section forgets that a read happened, so opening it again asks again. Without
+	// this the figures stay whatever they were when the section was last opened, which after any
+	// payment, batch, refund or request the reader went off and made is a total that quietly
+	// stops agreeing with the balance shown on the same page. Only the marker is cleared: the
+	// period is kept, so a range that was refused is asked for again rather than quietly swapped
+	// for the default one, and the refusal stays on screen until the reader changes it.
+	useEffect(() => {
+		if (!analyticsOpen) {
+			setAnalytics((current) => (current.loaded ? { ...current, loaded: false } : current));
+		}
+	}, [analyticsOpen]);
+
 	return (
 		<div className="app-shell">
 			<header className="app-shell-header">
@@ -843,6 +928,20 @@ export default function App() {
 									onCancel={() => setRefundTarget(null)}
 									onRefund={handleRefund}
 									onRetry={() => loadRefunds()}
+								/>
+							) : activityFilter === "analytics" ? (
+								/* Analytics is measured rather than listed, so it replaces the
+								    register instead of narrowing it. The chips above still decide
+								    what is being read — a period and a total are a different kind
+								    of thing from a row. */
+								<AnalyticsSection
+									figures={analytics.figures}
+									fromDate={analytics.from}
+									toDate={analytics.to}
+									loading={analytics.loading}
+									error={analytics.error}
+									onSelectPeriod={loadAnalytics}
+									onRetry={() => loadAnalytics({ from: analytics.from, to: analytics.to })}
 								/>
 							) : (
 								<WalletHistoryList

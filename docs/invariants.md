@@ -261,6 +261,31 @@ Running an analytics query must not:
 - modify ledger entries
 - alter transaction states
 
+Read-only is a precondition rather than a consequence. An aggregate that runs where a write
+could run beside it is one refactor away from moving money, and no test that only reads
+financial state afterwards would notice, because the mutation and the report would be the same
+event.
+
+Two properties follow from reading the ledger rather than writing to it, and R11 depends on
+both:
+
+**The population is the ledger, not the transfer.** A `FAILED` transfer is a real row and no
+ledger entry, because no money moved. A total read from `Transfer` documents would count an
+operation that paid nobody, and nothing about the answer would look wrong — the row is there,
+the amount is there, only the money is not. Every analytics figure must therefore be a sum of
+`LedgerEntry` amounts.
+
+**Net movement must equal the balance's own change.** Over any period,
+
+```text
+netMovement == derivedBalance(after) − derivedBalance(before)
+```
+
+for the account being read. This holds when — and only when — every counted entry moved the
+balance by its own amount. It is the property that catches an aggregate quietly including
+something that was never activity, such as an opening credit: including one shifts the total
+without shifting the wallet, and the two stop agreeing.
+
 ---
 
 # INV-15 — Batch Processing Safety

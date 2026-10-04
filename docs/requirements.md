@@ -34,7 +34,7 @@ R4  Money Requests                  implemented
 R5  Refunds & Reversals             implemented
 R8  Authentication, RBAC            implemented
 R7  Batch Processing                implemented
-R11 Analytics                       last
+R11 Analytics                       implemented
 ```
 
 That is eight end-to-end capabilities, inside the five-to-ten range the brief asks for. The
@@ -556,17 +556,79 @@ including:
 
 ## Acceptance Criteria
 
+Implemented and verified:
+
 - An authenticated account can read aggregate metrics for its own activity.
 - Totals sent and received for a period equal the sum of the corresponding ledger entries
   for that period.
-- A period containing no activity returns zero totals and an empty series, not an error.
-- Counts distinguish completed operations from failed ones.
-- Refund totals agree with the refunds recorded for the account in that period.
-- Volume over time returns one bucket per period across the requested range, including the
-  periods in which nothing happened.
+- A period containing no activity returns zero totals and zeroed buckets across the whole
+  range, not an error.
+- Volume over time returns one bucket per day across the requested range, including the
+  days in which nothing happened.
+- `transactionCount` counts completed operations and cannot count a failed one, because a
+  failed operation writes no ledger entry — there is nothing for a failure to be counted
+  from. This is why totals are read from the ledger and not from transfer documents.
+- Refund movements are counted once, as the ledger entries they are, inside total sent and
+  total received. There is no separate refund total, which was left out of scope.
 - One account cannot read another account's analytics.
 - Running analytics changes no balance, transfer, refund, request or ledger entry.
 - Analytics does not require the whole history to be paged to the client.
+
+Not implemented, with the reason recorded under "Decisions taken":
+
+- Successful versus failed operations reported as two figures. The population does not exist
+  to be reported: a `FAILED` transfer is a transfer document with no ledger entry, so a
+  failure count could only be read from `Transfer` documents — the one source R11 reads totals
+  from is the ledger, deliberately.
+- A refund total, and refunds as a share of what was paid.
+- The counterparties most frequently transacted with.
+
+## What was built
+
+```text
+GET /api/v1/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
+
+200
+{
+  "data": {
+    "currency": "INR",
+    "from": "2026-03-09",
+    "to": "2026-03-14",
+    "bucketSize": "DAY",
+    "timeZone": "UTC",
+    "sentMinor": 400000,
+    "receivedMinor": 230000,
+    "netMovementMinor": -170000,
+    "transactionCount": 4,
+    "averageAmountMinor": 157500,
+    "volume": [
+      { "bucket": "2026-03-09", "sentMinor": 0, "receivedMinor": 0, "transactionCount": 0 },
+      { "bucket": "2026-03-10", "sentMinor": 100000, "receivedMinor": 0, "transactionCount": 1 }
+    ]
+  }
+}
+```
+
+Every figure is summed in MongoDB from the caller's own ledger entries. Nothing is computed in
+the browser, and no figure is read from a `Transfer` document.
+
+The metric definitions, and which ledger kinds each one describes:
+
+| Field                | Definition                              | Kinds summed                 |
+| -------------------- | --------------------------------------- | ---------------------------- |
+| `sentMinor`          | Σ amount where the entry is a debit     | `TRANSFER_OUT`, `REFUND_OUT` |
+| `receivedMinor`      | Σ amount where the entry is a credit    | `TRANSFER_IN`, `REFUND_IN`   |
+| `netMovementMinor`   | `receivedMinor − sentMinor`             | derived from the two above   |
+| `transactionCount`   | count of those entries                  | all four                     |
+| `averageAmountMinor` | `floor(Σ amounts ÷ count)`, whole paise | all four                     |
+| `volume[]`           | the same three per UTC day, zero-filled | all four                     |
+
+`OPENING` is in none of them. The four kinds above partition every kind except `OPENING`, which
+is asserted in the tests rather than left to inspection.
+
+Because all four kinds are movements between two accounts, `netMovementMinor` is the change
+the wallet's own ledger records over the period. That is asserted directly, and it is what
+fails first if any figure ever counts something that did not move money.
 
 ## A distinction the implementation must not blur
 
@@ -582,25 +644,128 @@ operations that were attempted and failed. So:
 Adding these two as though they share a denominator produces a figure that is wrong in a way
 that is hard to notice. Any metric mixing the two must state which population it describes.
 
-## Open design decisions
+## Decisions taken
 
-These are unresolved and must be settled before implementation.
+These were open before implementation. Each is settled here, with the reason it was settled
+that way, because a decision that is only visible in the diff is a decision nobody can check.
 
-- **Period selection.** Fixed presets such as the last 7, 30 or 90 days and all time, or a
-  caller-supplied range?
-- **Bucket size and boundary.** Day or week, and whether a bucket boundary is UTC or local.
-  A period that crosses midnight is where this becomes visible.
-- **Surface.** A page of its own, or a section within the existing Activity page. A separate
-  page needs a place in the header navigation; a section does not.
-- **Counterparties.** Whether "who I transact with most" belongs to this requirement or is a
-  separate feature. It is the most expensive of the listed metrics, because it needs the
-  counterparties resolved the way history already resolves them.
-- **The opening entry.** A wallet's `OPENING` entry is a credit that no counterparty sent.
-  It must not be counted as money received, while still being part of the balance. Whether
-  it is shown as a separate line is a presentation choice.
-- **Failed-operation visibility.** Whether a failure count is meaningful to the account at
-  all, given that a failed transfer releases its idempotency key and leaves the balance
-  untouched.
+### Period selection
+
+`GET /api/v1/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD`, both optional.
+
+A period is a window of 30 days unless both of its ends are named. Naming one end anchors
+that window on the day named, so `?from=<day>` reads the 30 days from it and `?to=<day>` the
+30 days up to it; naming neither anchors it on today. Anchoring the unnamed end on _today_
+instead was the obvious alternative and is worse: `?to=<a day last month>` would then produce
+a range that runs backwards, so the only query that cannot express a past period would be the
+one that names its end.
+
+The format is exactly `YYYY-MM-DD`. `strptime` accepts `2026-3-10` and that one period would
+have two spellings, so the shape is matched before the value is parsed.
+
+Maximum 366 days, which is what bounds the response to 366 buckets.
+
+### Bucket size and boundary
+
+One bucket per day, always, on UTC day boundaries.
+
+**Why UTC.** The boundary has to be the same fact for every reader, and it is the server that
+decides. A browser-local bucket would make the same movement land in a different bucket for
+two people reading the same period, and a laptop with a wrong clock would move its own day
+edges. The cost is that a bucket is labeled with its UTC date, so a reader far from UTC sees
+a day that is not their midnight; the response states `timeZone` rather than leaving that to
+be guessed, and the browser's offset never enters the arithmetic.
+
+**Why fixed at a day.** A bucket-size parameter multiplies with the range: a 90-day window at
+week granularity is 13 buckets and at day granularity 90, so every caller would be choosing a
+tradeoff rather than reading a number. One size keeps the series comparable between periods
+and keeps the response bounded.
+
+**Endpoints are inclusive.** The last day is included by starting the range at the next day's
+midnight rather than at `23:59:59.999`, which would still leave a movement stored at a
+sub-millisecond resolution outside.
+
+### Empty buckets are returned, not omitted
+
+A day with no activity is returned as a day of zeros. The acceptance criteria above ask for
+"an empty series" for a quiet period; returning a full series of zeros is the more useful
+reading of that, and it is what the implementation does. A caller drawing bars cannot tell an
+absent column from a column of no height, so omitting gaps makes the caller infer them — which
+is the same mistake as computing the figures client-side, one level down. The zeros are
+additive: the buckets sum to the totals exactly.
+
+### Surface
+
+A section within Activity, as a fifth filter beside All / Sent / Received / Refunds.
+
+Analytics is a reading of the same activity the register lists, not a separate job, and giving
+it a page of its own would mean a place in the header navigation for a view most sessions open
+once. A filter costs one chip and no new route.
+
+### Counterparties — out of scope
+
+"Who I transact with most" is **not** part of this implementation. It is the most expensive
+metric listed, because it needs the counterparties resolved the way history already resolves
+them — a second query joining transfers to accounts — and it is a different question from the
+one this feature answers. A period and its totals answer "what did I do"; a ranked list of
+people answers "who do I deal with", and belongs with the register that already names them.
+
+### The opening entry
+
+`OPENING` is excluded from both totals and from the count, and remains part of the balance.
+
+It is a credit that no counterparty sent: it funds the wallet rather than being paid into it.
+Excluding it is what makes `netMovementMinor` exactly equal to the change the wallet's own
+ledger records over the period, which is the property that keeps the totals honest — if a
+figure counted something that never moved money, that equality would break. It is not shown as
+a separate line in the response; it is simply not activity, and `derived_balance` remains where
+it already was for anyone who wants to reconcile the two.
+
+### Failed operations — out of scope, and why they cannot appear
+
+There is no failure count in this implementation.
+
+A refused transfer leaves a `Transfer` row in `FAILED` and **no ledger entry**, because no
+money moved. So a failure is not activity and there is nothing in the ledger for it to be
+counted from — including one would mean reading totals from `Transfer` documents, which is
+exactly the population mix this requirement warns about. Refused operations are still
+diagnosable where they belong: on the transfer itself, and in the reconciliation sweep that
+exists to find them.
+
+### What this implementation does not do
+
+Also out of scope, deliberately, so the boundary is written down rather than inferred:
+refund counts and refund share of what was paid, and successful-versus-failed counts. The
+first needs the `refunds` collection joined to the ledger and is a refund feature's arithmetic
+wearing an analytics hat; the second is the failed-operation case above, which is a
+reconciliation question rather than an account's view of its own activity.
+
+### A refused period stays refused
+
+Three decisions here came out of walking the running application rather than out of reading
+the code, and each of them is a case where the obvious implementation is quietly wrong.
+
+**A period the service refuses is not answered by a different period.** The section records
+that a read has been attempted rather than testing whether figures came back, so a refusal
+is not mistaken for a first visit. Without that distinction the effect that reads the section
+on open answers a refusal by asking again for the bare default: the period the reader chose
+is replaced by another one, the message explaining the refusal is cleared, and nothing on
+screen says any of it happened. The dates the reader asked for stay in the inputs — a period
+that was refused is still the period they asked for, and they cannot correct a range they
+cannot see.
+
+**A chart wide enough to scroll opens at its newest end.** Every preset ends on the day the
+service reported, so the end of the period is the end a reader came for. A scrolling chart
+opens at the start, which on a narrow screen shows a flat stretch of days and pushes every
+recent movement past the edge — a chart that is merely cropped reads as a period with no
+activity in it. The scroll is a scroll position and nothing else; a window that fits is left
+where it is, and no figure is involved.
+
+**Zero carries no sign.** Every other money figure is written with the direction it moved in,
+because the direction is not something a reader should have to recall from the label above it.
+Zero did not move in any direction, so it is written as a plain amount: a signed zero would
+assert something that did not happen, which is the same mistake as leaving an empty day out
+of the series. The note under it says "nothing moved either way" for the same reason.
 
 ---
 
@@ -709,7 +874,7 @@ Batch Processing
 → R7, R12
 
 Analytics
-→ R11
+→ R11, R12
 
 Testing / Infrastructure
 → R13, R14
