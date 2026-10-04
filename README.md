@@ -172,17 +172,22 @@ bash setup.sh --seed
 ### Environment setup
 
 No manual configuration is required. `setup.sh` copies each `.env.example` to its `.env`
-where one exists, so the defaults are used as-is. To change them, edit the `.env` files
-directly — they are gitignored.
+where one exists, and fills in the two signing secrets described below. Every other
+default is used as-is. To change one, edit the `.env` files directly — they are gitignored.
 
 | File | Purpose |
 |---|---|
-| `backend/.env` | `PORT`, `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN` |
+| `backend/.env` | `PORT`, `NODE_ENV`, `MONGODB_URI`, `DJANGO_SECRET_KEY`, `JWT_SECRET`, `JWT_EXPIRES_IN` |
 | `frontend/.env` | `VITE_API_URL`, the API base path |
 
-`backend/.env.example` ships a development `JWT_SECRET`. **Set your own before exposing the
-backend to anything other than your own machine**, since anyone holding that value can mint a
-valid session token for any account.
+`DJANGO_SECRET_KEY` and `JWT_SECRET` are the only two values the repository refuses to
+carry. `backend/.env.example` declares them empty, and `setup.sh` generates a random value
+for each one the first time it runs, using Python's `secrets` module and falling back to
+OpenSSL or `/dev/urandom`. It writes them straight into `backend/.env` and does not print
+them, and a value that is already present is left alone, so re-running setup never
+invalidates a session you already hold. Because nothing is committed, every clone signs
+with a different key, and anyone holding yours can mint a valid session token for any
+account — so treat the file as a secret and do not paste it anywhere.
 
 ## Ports and API
 
