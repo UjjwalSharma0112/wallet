@@ -60,7 +60,6 @@ from .constants import (
     TRANSFER_NOT_REFUNDABLE_CODE,
     TRANSFER_NOT_REFUNDABLE_MESSAGE,
 )
-from .models import Refund
 
 
 def refund_key(refund_id):
@@ -360,8 +359,8 @@ def decorate_entries(entries, viewer_account_id):
     if not transfers:
         return entries
 
-    refund_rows = list(
-        Refund.objects(__raw__={"transferId": {"$in": [transfer["_id"] for transfer in transfers.values() if transfer.get("refundOf")]}}).as_pymongo()
+    refund_rows = repository.find_by_transfer_ids(
+        [transfer["_id"] for transfer in transfers.values() if transfer.get("refundOf")]
     )
     refund_by_transfer = {row["transferId"]: row for row in refund_rows}
 

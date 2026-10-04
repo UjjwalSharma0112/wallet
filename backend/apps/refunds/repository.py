@@ -42,6 +42,14 @@ def find_by_key(initiator_user_id, idempotency_key):
     return Refund.objects(__raw__=conditions).as_pymongo().first()
 
 
+def find_by_transfer_ids(transfer_ids):
+    """The refunds recorded against these transfers, so a history row can name the reversal."""
+    if not transfer_ids:
+        return []
+
+    return list(Refund.objects(__raw__={"transferId": {"$in": list(transfer_ids)}}).as_pymongo())
+
+
 def list_for_initiator(initiator_user_id, limit, offset):
     conditions = {"initiatorUserId": ObjectId(initiator_user_id)}
 
